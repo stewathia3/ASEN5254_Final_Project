@@ -27,7 +27,7 @@ class Edge:
     def __init__(self, trajectory):
         self.trajectory = trajectory
 
-def ODEFunc(t,state,u1,u2,u3): #ode function
+def DroneDynamics(t,state,u1,u2,u3): #ode function
     
     x,y,z,v,psi,theta = state
     omega,alpha,a = u1,u2,u3
@@ -87,7 +87,7 @@ def GenerateTrajectory(state,new_state): #state is qnear and new_state is q_rand
         u3 = np.random.uniform(-1/2, 1/2)
         control = (u1,u2,u3)
         #.y gets the results, .t gets the time
-        result_solve_ivp = solve_ivp(ODEFunc, t_span, state,args=control, method = 'RK45')
+        result_solve_ivp = solve_ivp(DroneDynamics, t_span, state,args=control, method = 'RK45')
     
         traj = result_solve_ivp.y
         best_con = math.dist(new_state,traj[:,-1])
@@ -119,9 +119,6 @@ def create_rrt(start, goal,n, Q, plot_path):
 
     # STEP 1: Initialize tree with root/start node
     tree = [Node(0, start, None, 0.0,[])]
-    
-    
-
 
     curr_node = tree[0]
     x,y,z,p,ta,v = start
