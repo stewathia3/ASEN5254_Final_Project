@@ -9,6 +9,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 import math
+import mpl_toolkits.mplot3d.art3d as art3d
 
 
 ## ODE fix later 
@@ -98,6 +99,7 @@ def GenerateTrajectory(state,new_state): #state is qnear and new_state is q_rand
     
     return trajectories,time
 
+# Constraints
 def TrajectoryValid(trajectories,time): #does the trajectory work?
     x,y,z,ta,v = trajectories[0,:],trajectories[1,:],trajectories[2,:],trajectories[4,:],trajectories[5,:]
     
@@ -134,7 +136,6 @@ def create_rrt(start, goal,n, Q, plot_path):
         
         new_state = generateNode(Q,goal)
 
-
         # Find node from tree that is closest to q_rand
 
         state = None # TODO:
@@ -163,23 +164,16 @@ def create_rrt(start, goal,n, Q, plot_path):
            
             tree.append(curr_node) #appends an object
             x,y,z,p,ta,v = x_new
-            
-            
-        
-        if len(tree) == 50*stopper:
-            stopper +=1
-            
-
 
     if len(tree)>=n:
         solution_found = False
 
+    path = []
+    kino_path = []
+    path_length = 0.0
+
     # STEP 3: Create path from goal to start going up the tree
     if solution_found == True:
-
-        path = []
-        kino_path = []
-        path_length = 0.0
 
         curr_node = tree[-1]
 
@@ -193,7 +187,7 @@ def create_rrt(start, goal,n, Q, plot_path):
 
         path.insert(0, curr_node)
         
-    return True, path, path_length, len(tree),kino_path
+    return solution_found, path, path_length, len(tree),kino_path
 
     
 
@@ -203,6 +197,55 @@ y_goal = [8,9]
 z_goal = [4,5]
 v_goal = [-1/20,1/20]
 
+def plot_rectangular_prism(ax, x_bounds, y_bounds, z_bounds, color, alpha):
+
+    # Vertices
+
+    # For now, draw 6 rectangles
+    face1 = plt.Polygon([[x_bounds[0], z_bounds[0]], \
+                        [x_bounds[0], z_bounds[1]], \
+                        [x_bounds[1], z_bounds[1]], \
+                        [x_bounds[1], z_bounds[0]]], color = color, alpha = alpha)
+    
+    face2 = plt.Polygon([[x_bounds[0], z_bounds[0]], \
+                        [x_bounds[0], z_bounds[1]], \
+                        [x_bounds[1], z_bounds[1]], \
+                        [x_bounds[1], z_bounds[0]]], color = color, alpha = alpha)
+
+    ax.add_patch(face1)
+    ax.add_patch(face2)
+    art3d.patch_2d_to_3d(face1, z = y_bounds[0], zdir = "y")
+    art3d.patch_2d_to_3d(face2, z = y_bounds[1], zdir = "y")
+
+    face3 = plt.Polygon([[y_bounds[0], z_bounds[0]], \
+                        [y_bounds[0], z_bounds[1]], \
+                        [y_bounds[1], z_bounds[1]], \
+                        [y_bounds[1], z_bounds[0]]], color = color, alpha = alpha)
+
+    face4 = plt.Polygon([[y_bounds[0], z_bounds[0]], \
+                        [y_bounds[0], z_bounds[1]], \
+                        [y_bounds[1], z_bounds[1]], \
+                        [y_bounds[1], z_bounds[0]]], color = color, alpha = alpha)
+    
+    ax.add_patch(face3)
+    art3d.pathpatch_2d_to_3d(face3, z = x_bounds[0], zdir = "x")
+    ax.add_patch(face4)
+    art3d.pathpatch_2d_to_3d(face4, z = x_bounds[1], zdir = "x")
+
+    face5 = plt.Polygon([[x_bounds[0], y_bounds[0]], \
+                        [x_bounds[0], y_bounds[1]], \
+                        [x_bounds[1], y_bounds[1]], \
+                        [x_bounds[1], y_bounds[0]]], color = color, alpha = alpha)
+    
+    face6 = plt.Polygon([[x_bounds[0], y_bounds[0]], \
+                        [x_bounds[0], y_bounds[1]], \
+                        [x_bounds[1], y_bounds[1]], \
+                        [x_bounds[1], y_bounds[0]]], color = color, alpha = alpha)
+    
+    ax.add_patch(face5)
+    art3d.pathpatch_2d_to_3d(face5, z = z_bounds[0], zdir = "z")
+    ax.add_patch(face6)
+    art3d.pathpatch_2d_to_3d(face6, z = z_bounds[1], zdir = "z")
 
 if __name__ == '__main__':
 
@@ -228,22 +271,33 @@ if __name__ == '__main__':
 
     solution_found, path, path_length, tree_size,kino_path = create_rrt(start, goal, n, Q, True)
     
+    # print(solution_found)
 
-#kinopath is the kinodynamic path
-x,y,z,p,ta,v = np.array([]),np.array([]),np.array([]),np.array([]),np.array([]),np.array([])
+    #kinopath is the kinodynamic path
+    x,y,z,p,ta,v = np.array([]),np.array([]),np.array([]),np.array([]),np.array([]),np.array([])
 
-for i in range(len(kino_path)):
-    x = np.append(x,kino_path[i][0])
-    y = np.append(y,kino_path[i][1])
-    z= np.append(z,kino_path[i][2])
-    p = np.append(p,kino_path[i][3])
-    ta = np.append(ta,kino_path[i][4])
-    v = np.append(v,kino_path[i][5])
-    
-fig = plt.figure()
-ax = plt.axes(projection='3d')
-ax.plot(x,y,z)
-ax.set_title('Quadrotor Trajectory')
-ax.set_xlabel('x')
-ax.set_ylabel('y')
-ax.set_zlabel('z')
+    for i in range(len(kino_path)):
+        x = np.append(x,kino_path[i][0])
+        y = np.append(y,kino_path[i][1])
+        z= np.append(z,kino_path[i][2])
+        p = np.append(p,kino_path[i][3])
+        ta = np.append(ta,kino_path[i][4])
+        v = np.append(v,kino_path[i][5])
+        
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    ax.plot(x,y,z)
+
+    # Plot start and goal points
+    ax.scatter(start[0], start[1], start[2], color = 'b')
+    ax.scatter(goal[0], goal[1], goal[2], color = 'g')
+
+    # Plot goal region
+    plot_rectangular_prism(ax, np.array([9.0, 11.0]), np.array([8.0, 10.0]), np.array([3.0, 5.0]), 'g', 0.2)
+
+    ax.set_title('Quadrotor Trajectory')
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+
+    plt.show()
