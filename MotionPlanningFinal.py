@@ -1,15 +1,9 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Dec  1 12:51:32 2022
-
-@author: riana
-"""
-
 import numpy as np
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 import math
 import mpl_toolkits.mplot3d.art3d as art3d
+import hppfcl as fcl
 
 
 ## ODE fix later 
@@ -29,10 +23,10 @@ class Edge:
 
 def DroneDynamics(t,state,u1,u2,u3): #ode function
     
-    x,y,z,v,psi,theta = state
+    x,y,z,psi,theta,v = state
     omega,alpha,a = u1,u2,u3
     
-    #input state: [x,y,z,v,psi,theta]
+    #input state: [x,y,z,psi,theta,v]
     xdot = v*np.cos(psi)*np.cos(theta)
     ydot = v*np.sin(psi)*np.cos(theta)
     zdot = v*np.sin(theta) 
@@ -41,6 +35,18 @@ def DroneDynamics(t,state,u1,u2,u3): #ode function
     vdot = a
 
     return [xdot,ydot,zdot,psidot,thetadot,vdot]
+
+def RoverDynamics(t,state,uv,up): #ode function
+    
+    x,y,theta = state
+    
+    L = 1 #car length
+    #input state: [x,y,theta]
+    xdot = uv*np.cos(theta)
+    ydot = uv*np.sin(theta)
+    thetadot = uv/L*np.tan(up)
+
+    return [xdot,ydot,thetadot]
 
 
 def generateNode(Q,q_goal): #generate 6 state 
@@ -64,7 +70,17 @@ def generateNode(Q,q_goal): #generate 6 state
         v = np.random.uniform(v_min,v_max)
         p = np.random.uniform(-np.pi/2,np.pi/2)
         ta = np.random.uniform(theta_min,theta_max)
+
+        xr = np.random.uniform(x_min,x_max)
+        yr = np.random.uniform(y_min,y_max)
+        tr = np.random.uniform(-np.pi/2,np.pi/2)
+
+        #single agent tests
         q_rand = [x,y,z,p,ta,v]
+        # q_rand = [xr,yr,tr]
+
+        #for multi agent 
+        # q_rand = [x,y,z,p,ta,v,xr,yr,tr]
         
         
         
@@ -86,8 +102,18 @@ def GenerateTrajectory(state,new_state): #state is qnear and new_state is q_rand
         u2 = np.random.uniform(-np.pi/6, np.pi/6)
         u3 = np.random.uniform(-1/2, 1/2)
         control = (u1,u2,u3)
+        uv = np.random.uniform(-1,1)
+        up = np.random.uniform(-np.pi/2, np.pi/2)
+        control_rover = (uv,up)
         #.y gets the results, .t gets the time
+
+        #for one agent
         result_solve_ivp = solve_ivp(DroneDynamics, t_span, state,args=control, method = 'RK45')
+        # result_solve_ivp = solve_ivp(DroneDynamics, t_span, state,args=control_rover, method = 'RK45')
+
+        #this will be used for multi agent
+        # result_solve_ivp = solve_ivp(DroneDynamics, t_span, state[0:5],args=control, method = 'RK45')
+        # result_solve_ivp = solve_ivp(RoverDynamics, t_span, state[6:8],args=control_rover, method = 'RK45')
     
         traj = result_solve_ivp.y
         best_con = math.dist(new_state,traj[:,-1])
@@ -101,10 +127,21 @@ def GenerateTrajectory(state,new_state): #state is qnear and new_state is q_rand
 
 # Constraints
 def TrajectoryValid(trajectories,time): #does the trajectory work?
+
+    #for single agent
     x,y,z,ta,v = trajectories[0,:],trajectories[1,:],trajectories[2,:],trajectories[4,:],trajectories[5,:]
+    # xr,yr = trajectories[0,:],trajectories[1,:]
+
+    # for multi agent
+    # x,y,z,ta,v,xr,yr =  trajectories[0,:],trajectories[1,:],trajectories[2,:],trajectories[4,:],trajectories[5,:],trajectories[6,:],trajectories[7,:]
+
+    
+
     
     #trajectory out of given constraints
     for i in range(len(time)): 
+        # if (0<=xr[i]<=11) and (0<=yr[i]<=10):
+        # if (0<=x[i]<=11) and (0<=y[i]<=10) and (0<=z[i]<=10) and (-1<=v[i]<=1) and (-np.pi/3<=ta[i]<=np.pi/3) and (0<=xr[i]<=11) and (0<=yr[i]<=10):
         if (0<=x[i]<=11) and (0<=y[i]<=10) and (0<=z[i]<=10) and (-1<=v[i]<=1) and (-np.pi/3<=ta[i]<=np.pi/3):
             Valid = 1
             
@@ -121,11 +158,21 @@ def create_rrt(start, goal,n, Q, plot_path):
     tree = [Node(0, start, None, 0.0,[])]
 
     curr_node = tree[0]
+
+    #single agent
     x,y,z,p,ta,v = start
+    # xr,yr,tr = start
+
+    #centralized multi agent
+    # x,y,z,p,ta,v,xr,yr,tr = start
     solution_found = True
-    stopper= 1
 
     # STEP 2: Loop until n samples created or goal reached
+    #multi agent
+    # while (len(tree) < n) and not(9<=x<=11 and 8<=y<=10 and 3<=z<=5 and -1/20<=v<=1/20 and 9<=xr<=11 and 8<=yr<=10):
+
+    #single agent 
+    # while (len(tree) < n) and not(9<=xr<=11 and 8<=yr<=10):
     while (len(tree) < n) and not(9<=x<=11 and 8<=y<=10 and 3<=z<=5 and -1/20<=v<=1/20):
 
         # print(len(tree))
@@ -160,7 +207,13 @@ def create_rrt(start, goal,n, Q, plot_path):
             curr_node = Node(len(tree), x_new, state, math.dist(x_new, state.point),trajectories)
            
             tree.append(curr_node) #appends an object
+
+            #single agent tests
             x,y,z,p,ta,v = x_new
+            #xr,yr,tr = x_new
+
+            #multi agent
+            # x,y,z,p,ta,v,xr,yr,tr = x_new
 
     if len(tree)>=n:
         solution_found = False
@@ -249,11 +302,22 @@ if __name__ == '__main__':
     #-----------------------------------------------------------------------------#
     # Exercise 2 (a): Planning problem of HW2 Exercise 2 (W1)
     #-----------------------------------------------------------------------------#
+    #single agent tests
+    xr,yr,tr = 1,1,0
     x,y,z,psi,theta,v = 1,1,1,0,0,0
     start = [x,y,z,psi,theta,v]
+    # start = [xr,yr,tr]
+    
+    #multi agent 
+    #start = [x,y,z,psi,theta,v,xr,yr,tr]
     
     #hypothetical goal state that will lead to goal region
+    #single agent tests
     goal = [9.5,8.5,4.5,np.random.uniform(-np.pi/2,np.pi/2),0,0]
+    #goal = [9.5,8.5,0]
+
+    #multi agent 
+    # goal = [9.5,8.5,4.5,np.random.uniform(-np.pi/2,np.pi/2),0,0,9.5,8.5,0]
 
 
     n = 5000
@@ -272,6 +336,7 @@ if __name__ == '__main__':
 
     #kinopath is the kinodynamic path
     x,y,z,p,ta,v = np.array([]),np.array([]),np.array([]),np.array([]),np.array([]),np.array([])
+    xr,yr,tr = np.array([]),np.array([]),np.array([])
 
     for i in range(len(kino_path)):
         x = np.append(x,kino_path[i][0])
@@ -280,7 +345,12 @@ if __name__ == '__main__':
         p = np.append(p,kino_path[i][3])
         ta = np.append(ta,kino_path[i][4])
         v = np.append(v,kino_path[i][5])
-        
+
+        #xr = np.append(xr,kino_path[i][0]) # or index 6
+        #yr = np.append(yr,kino_path[i][1]) # or index 7
+        # tr = np.append(tr,kino_path[i][2]) #or index at 8 
+
+    #zr = np.zeros(len(xr)) #this will be for plotting on the same graph 
     fig = plt.figure()
     ax = plt.axes(projection='3d')
     ax.plot(x,y,z)
