@@ -5,7 +5,6 @@ import math
 import mpl_toolkits.mplot3d.art3d as art3d
 import hppfcl as fcl
 
-
 ## ODE fix later 
 
 class Node:
@@ -150,6 +149,18 @@ def TrajectoryValid(trajectories,time): #does the trajectory work?
             break
     
     return Valid
+
+def plt_sphere(list_center, list_radius):
+  for c, r in zip(list_center, list_radius):
+    ax = fig.gca(projection='3d')
+
+    # draw sphere
+    u, v = np.mgrid[0:2*np.pi:50j, 0:np.pi:50j]
+    x = r*np.cos(u)*np.sin(v)
+    y = r*np.sin(u)*np.sin(v)
+    z = r*np.cos(v)
+
+    ax.plot_surface(x+c[0], y+c[1], z+c[2], color=np.random.choice(['g','b']), alpha=0.5*np.random.random()+0.5)
 
 def create_rrt(start, goal,n, Q, plot_path):
 
@@ -351,9 +362,17 @@ if __name__ == '__main__':
         # tr = np.append(tr,kino_path[i][2]) #or index at 8 
 
     #zr = np.zeros(len(xr)) #this will be for plotting on the same graph 
+    list_radius = [.2]*len(x)
+    list_center = []
+
+    for i in range(len(x)):
+        list_center.insert(0,(x[i],y[i],z[i]))
+
     fig = plt.figure()
     ax = plt.axes(projection='3d')
     ax.plot(x,y,z)
+    #take this out to see the point robot -- it makes the graphing really slow
+    plt_sphere(list_center, list_radius) 
 
     # Plot start and goal points
     ax.scatter(start[0], start[1], start[2], color = 'b')
