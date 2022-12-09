@@ -167,8 +167,8 @@ def generateNode(Q,q_goal): #generate 6 state
         tr = np.random.uniform(-np.pi/2,np.pi/2)
 
         #single agent tests
-        q_rand = [x,y,z,p,ta,v]
-        # q_rand = [xr,yr,tr]
+        # q_rand = [x,y,z,p,ta,v]
+        q_rand = [xr,yr,tr]
 
         #for multi agent 
         # q_rand = [x,y,z,p,ta,v,xr,yr,tr]
@@ -212,8 +212,8 @@ def GenerateTrajectory(state,new_state): #state is qnear and new_state is q_rand
         #.y gets the results, .t gets the time
 
         #for one agent
-        result_solve_ivp = solve_ivp(DroneDynamics, t_span, state,args=control, method = 'RK45')
-        # result_solve_ivp = solve_ivp(DroneDynamics, t_span, state,args=control_rover, method = 'RK45')
+        # result_solve_ivp = solve_ivp(DroneDynamics, t_span, state,args=control, method = 'RK45')
+        result_solve_ivp = solve_ivp(RoverDynamics, t_span, state,args=control_rover, method = 'RK45')
 
         #this will be used for multi agent
         # result_solve_ivp = solve_ivp(DroneDynamics, t_span, state[0:5],args=control, method = 'RK45')
@@ -246,14 +246,17 @@ def GenerateTrajectory(state,new_state): #state is qnear and new_state is q_rand
 def TrajectoryValid(trajectories,time, obstacles = []): 
 
     #for single agent
-    x,y,z,ta,v = trajectories[0,:],trajectories[1,:],trajectories[2,:],trajectories[4,:],trajectories[5,:]
-    # xr,yr = trajectories[0,:],trajectories[1,:]
+    # x,y,z,ta,v = trajectories[0,:],trajectories[1,:],trajectories[2,:],trajectories[4,:],trajectories[5,:]
+    xr,yr = trajectories[0,:],trajectories[1,:]
 
     # for multi agent
     # x,y,z,ta,v,xr,yr =  trajectories[0,:],trajectories[1,:],trajectories[2,:],trajectories[4,:],trajectories[5,:],trajectories[6,:],trajectories[7,:]
 
-    # For drone
-    drone = fcl.Sphere(0.2)
+    # DRONE
+    # agent = fcl.Sphere(0.2)
+
+    # ROVER
+    agent = fcl.Box(np.array([1.0, 1.0, 1.0]))
 
     #trajectory out of given constraints
     # for i in range(len(time)): 
@@ -269,15 +272,16 @@ def TrajectoryValid(trajectories,time, obstacles = []):
     Valid = 1 # Let's assume the trajectory is valid until proven invalid
 
     for i in range(len(time)): 
-        if (0<=x[i]<=11) and (0<=y[i]<=10) and (0<=z[i]<=10) and (-1<=v[i]<=1) and (-np.pi/3<=ta[i]<=np.pi/3):
-        # if ( x[i] < 0 or x[i] > 11) or (y[i] < 0 or y[i] > 10) or (z[i] < 0 or z[i] > 10) or (abs(v[i]) > 1) or (abs(ta[i]) > np.pi/3):
+        if (0<=xr[i]<=11) and (0<=yr[i]<=10):
+        # if (0<=x[i]<=11) and (0<=y[i]<=10) and (0<=z[i]<=10) and (-1<=v[i]<=1) and (-np.pi/3<=ta[i]<=np.pi/3):
             Valid = 1
         else:
             Valid = 0
             break
 
         # Collision check
-        M_drone = fcl.Transform3f(np.eye(3), np.array([x[i], y[i], z[i]]))
+        M_agent = fcl.Transform3f(np.eye(3), np.array([xr[i], yr[i], 0.5]))
+        # M_agent = fcl.Transform3f(np.eye(3), np.array([x[i], y[i], z[i]]))
 
         req = fcl.CollisionRequest()
         res = fcl.CollisionResult()
@@ -290,7 +294,7 @@ def TrajectoryValid(trajectories,time, obstacles = []):
             M_obstacle = obstacles[obs_i][1]
 
             
-            if fcl.collide(drone, M_drone, obstacle, M_obstacle, req, res):
+            if fcl.collide(agent, M_agent, obstacle, M_obstacle, req, res):
                 Valid = 0
                 break
 
@@ -353,8 +357,8 @@ def create_rrt(start, goal, n, Q, plot_path = False, obstacles = []):
     curr_node = tree[0]
 
     #single agent
-    x,y,z,p,ta,v = start
-    # xr,yr,tr = start
+    # x,y,z,p,ta,v = start
+    xr,yr,tr = start
 
     #centralized multi agent
     # x,y,z,p,ta,v,xr,yr,tr = start
@@ -365,8 +369,8 @@ def create_rrt(start, goal, n, Q, plot_path = False, obstacles = []):
     # while (len(tree) < n) and not(9<=x<=11 and 8<=y<=10 and 3<=z<=5 and -1/20<=v<=1/20 and 9<=xr<=11 and 8<=yr<=10):
 
     #single agent 
-    # while (len(tree) < n) and not(9<=xr<=11 and 8<=yr<=10):
-    while (len(tree) < n) and not(9<=x<=11 and 8<=y<=10 and 3<=z<=5 and -1/20<=v<=1/20):
+    while (len(tree) < n) and not(9<=xr<=11 and 8<=yr<=10):
+    # while (len(tree) < n) and not(9<=x<=11 and 8<=y<=10 and 3<=z<=5 and -1/20<=v<=1/20):
 
         # print(len(tree))
         # print(math.dist(curr_node.point, goal))
@@ -402,8 +406,8 @@ def create_rrt(start, goal, n, Q, plot_path = False, obstacles = []):
             tree.append(curr_node) #appends an object
 
             #single agent tests
-            x,y,z,p,ta,v = x_new
-            #xr,yr,tr = x_new
+            # x,y,z,p,ta,v = x_new
+            xr,yr,tr = x_new
 
             #multi agent
             # x,y,z,p,ta,v,xr,yr,tr = x_new
@@ -457,55 +461,62 @@ v_goal = [-1/20,1/20]
 # Outputs:
 #   - None- just plots spheres in the matplotlib workspace figure
 #-----------------------------------------------------------------------------#
-def plot_rectangular_prism(ax, x_bounds, y_bounds, z_bounds, color, alpha):
+def plot_rectangular_prism(ax, x_bound_arr, y_bound_arr, z_bound_arr, color, alpha):
 
     # Vertices
 
-    # For now, draw 6 rectangles
-    face1 = plt.Polygon([[x_bounds[0], z_bounds[0]], \
-                        [x_bounds[0], z_bounds[1]], \
-                        [x_bounds[1], z_bounds[1]], \
-                        [x_bounds[1], z_bounds[0]]], color = color, alpha = alpha)
-    
-    face2 = plt.Polygon([[x_bounds[0], z_bounds[0]], \
-                        [x_bounds[0], z_bounds[1]], \
-                        [x_bounds[1], z_bounds[1]], \
-                        [x_bounds[1], z_bounds[0]]], color = color, alpha = alpha)
+    for i in range(np.size(x_bound_arr, 0)):
 
-    ax.add_patch(face1)
-    ax.add_patch(face2)
-    art3d.patch_2d_to_3d(face1, z = y_bounds[0], zdir = "y")
-    art3d.patch_2d_to_3d(face2, z = y_bounds[1], zdir = "y")
+        x_bounds = x_bound_arr[i,:]
+        y_bounds = y_bound_arr[i,:]
+        z_bounds = z_bound_arr[i,:]
 
-    face3 = plt.Polygon([[y_bounds[0], z_bounds[0]], \
-                        [y_bounds[0], z_bounds[1]], \
-                        [y_bounds[1], z_bounds[1]], \
-                        [y_bounds[1], z_bounds[0]]], color = color, alpha = alpha)
 
-    face4 = plt.Polygon([[y_bounds[0], z_bounds[0]], \
-                        [y_bounds[0], z_bounds[1]], \
-                        [y_bounds[1], z_bounds[1]], \
-                        [y_bounds[1], z_bounds[0]]], color = color, alpha = alpha)
-    
-    ax.add_patch(face3)
-    art3d.pathpatch_2d_to_3d(face3, z = x_bounds[0], zdir = "x")
-    ax.add_patch(face4)
-    art3d.pathpatch_2d_to_3d(face4, z = x_bounds[1], zdir = "x")
+        # For now, draw 6 rectangles
+        face1 = plt.Polygon([[x_bounds[0], z_bounds[0]], \
+                            [x_bounds[0], z_bounds[1]], \
+                            [x_bounds[1], z_bounds[1]], \
+                            [x_bounds[1], z_bounds[0]]], color = color, alpha = alpha)
+        
+        face2 = plt.Polygon([[x_bounds[0], z_bounds[0]], \
+                            [x_bounds[0], z_bounds[1]], \
+                            [x_bounds[1], z_bounds[1]], \
+                            [x_bounds[1], z_bounds[0]]], color = color, alpha = alpha)
 
-    face5 = plt.Polygon([[x_bounds[0], y_bounds[0]], \
-                        [x_bounds[0], y_bounds[1]], \
-                        [x_bounds[1], y_bounds[1]], \
-                        [x_bounds[1], y_bounds[0]]], color = color, alpha = alpha)
-    
-    face6 = plt.Polygon([[x_bounds[0], y_bounds[0]], \
-                        [x_bounds[0], y_bounds[1]], \
-                        [x_bounds[1], y_bounds[1]], \
-                        [x_bounds[1], y_bounds[0]]], color = color, alpha = alpha)
-    
-    ax.add_patch(face5)
-    art3d.pathpatch_2d_to_3d(face5, z = z_bounds[0], zdir = "z")
-    ax.add_patch(face6)
-    art3d.pathpatch_2d_to_3d(face6, z = z_bounds[1], zdir = "z")
+        ax.add_patch(face1)
+        ax.add_patch(face2)
+        art3d.patch_2d_to_3d(face1, z = y_bounds[0], zdir = "y")
+        art3d.patch_2d_to_3d(face2, z = y_bounds[1], zdir = "y")
+
+        face3 = plt.Polygon([[y_bounds[0], z_bounds[0]], \
+                            [y_bounds[0], z_bounds[1]], \
+                            [y_bounds[1], z_bounds[1]], \
+                            [y_bounds[1], z_bounds[0]]], color = color, alpha = alpha)
+
+        face4 = plt.Polygon([[y_bounds[0], z_bounds[0]], \
+                            [y_bounds[0], z_bounds[1]], \
+                            [y_bounds[1], z_bounds[1]], \
+                            [y_bounds[1], z_bounds[0]]], color = color, alpha = alpha)
+        
+        ax.add_patch(face3)
+        art3d.pathpatch_2d_to_3d(face3, z = x_bounds[0], zdir = "x")
+        ax.add_patch(face4)
+        art3d.pathpatch_2d_to_3d(face4, z = x_bounds[1], zdir = "x")
+
+        face5 = plt.Polygon([[x_bounds[0], y_bounds[0]], \
+                            [x_bounds[0], y_bounds[1]], \
+                            [x_bounds[1], y_bounds[1]], \
+                            [x_bounds[1], y_bounds[0]]], color = color, alpha = alpha)
+        
+        face6 = plt.Polygon([[x_bounds[0], y_bounds[0]], \
+                            [x_bounds[0], y_bounds[1]], \
+                            [x_bounds[1], y_bounds[1]], \
+                            [x_bounds[1], y_bounds[0]]], color = color, alpha = alpha)
+        
+        ax.add_patch(face5)
+        art3d.pathpatch_2d_to_3d(face5, z = z_bounds[0], zdir = "z")
+        ax.add_patch(face6)
+        art3d.pathpatch_2d_to_3d(face6, z = z_bounds[1], zdir = "z")
 
 if __name__ == '__main__':
 
@@ -529,12 +540,12 @@ if __name__ == '__main__':
     # For single agents:
 
     # ROVER
-    # start = [xr,yr,tr] 
-    # goal = [9.5,8.5,0]
+    start = [xr,yr,tr] 
+    goal = [9.5,8.5,0]
 
     # DRONE
-    start = [x,y,z,psi,theta,v] 
-    goal = [9.5,8.5,4.5,np.random.uniform(-np.pi/2,np.pi/2),0,0]
+    # start = [x,y,z,psi,theta,v] 
+    # goal = [9.5,8.5,4.5,np.random.uniform(-np.pi/2,np.pi/2),0,0]
     
     # For multi-agent, or [DRONE, ROVER]:
 
@@ -565,52 +576,98 @@ if __name__ == '__main__':
     for i in range(len(kino_path)):
 
         # DRONE
-        x = np.append(x,kino_path[i][0])
-        y = np.append(y,kino_path[i][1])
-        z= np.append(z,kino_path[i][2])
-        p = np.append(p,kino_path[i][3])
-        ta = np.append(ta,kino_path[i][4])
-        v = np.append(v,kino_path[i][5])
+        # x = np.append(x,kino_path[i][0])
+        # y = np.append(y,kino_path[i][1])
+        # z= np.append(z,kino_path[i][2])
+        # p = np.append(p,kino_path[i][3])
+        # ta = np.append(ta,kino_path[i][4])
+        # v = np.append(v,kino_path[i][5])
 
         # ROVER
-        #xr = np.append(xr,kino_path[i][0]) # or index 6
-        #yr = np.append(yr,kino_path[i][1]) # or index 7
-        # tr = np.append(tr,kino_path[i][2]) #or index at 8 
+        xr = np.append(xr,kino_path[i][0]) # or index 6
+        yr = np.append(yr,kino_path[i][1]) # or index 7
+        tr = np.append(tr,kino_path[i][2]) #or index at 8 
 
     # Array of constant z values to plot the rover on the same 3D plot
-    # zr = np.zeros(len(xr)) #this will be for plotting on the same graph 
+    zr = 0.5 * np.ones(len(xr)) #this will be for plotting on the same graph 
 
-    # Reorder the DRONE states to plot spheres
-    list_radius = [.2]*len(x)
+    # Reorder the states to plot spheres/rectangular prisms along path
+    drone_radius = [.2]*len(x)
+    rover_side_length = [1] * len(x)
+
     list_center = []
 
-    for i in range(len(x)):
-        list_center.insert(0,(x[i],y[i],z[i]))
+    # for i in range(len(x)):
+    #     list_center.insert(0,(x[i],y[i],z[i]))
 
     fig = plt.figure()
     ax = plt.axes(projection='3d')
-    ax.plot(x,y,z)
+
+    # ax.plot(x,y,z)
+    ax.plot(xr,yr,zr)
 
     # Plot spheres to represent the drone- only 30 spheres will be plotted along the path (too slow otherwise)
-    if len(list_center) > 30:
-        plt_sphere(ax, list_center[::math.floor(len(list_center) / 30.0)], list_radius, 'k', 0.7) 
+    # if len(list_center) > 30:
+    if len(xr) > 30:
+        # DRONE
+        # plt_sphere(ax, list_center[::math.floor(len(list_center) / 30.0)], drone_radius, 'k', 0.7) 
+
+        # ROVER
+        x_left = xr[::math.floor(len(xr) / 15.0)] - 0.5
+        x_right = xr[::math.floor(len(xr) / 15.0)] + 0.5
+
+        y_left = yr[::math.floor(len(yr) / 15.0)] - 0.5
+        y_right = yr[::math.floor(len(yr) / 15.0)] + 0.5
+
+        z_left = zr[::math.floor(len(zr) / 15.0)] - 0.5
+        z_right = zr[::math.floor(len(zr) / 15.0)] + 0.5
+
+        plot_rectangular_prism(ax, np.concatenate((x_left.reshape(len(x_left), 1), x_right.reshape(len(x_right), 1)), axis = 1), \
+                                   np.concatenate((y_left.reshape(len(y_left), 1), y_right.reshape(len(y_right), 1)), axis = 1), \
+                                   np.concatenate((z_left.reshape(len(z_left), 1), z_right.reshape(len(z_right), 1)), axis = 1), 'k', 0.5)
+
     else:
-        plt_sphere(ax, list_center, list_radius, 'k', 0.7) 
+        # DRONE
+        # plt_sphere(ax, list_center, drone_radius, 'k', 0.7) 
+
+        # ROVER
+        x_left = xr - 0.5
+        x_right = xr + 0.5
+
+        y_left = yr - 0.5
+        y_right = yr + 0.5
+
+        z_left = zr - 0.5
+        z_right = zr + 0.5
+
+        plot_rectangular_prism(ax, np.concatenate((x_left, x_right), axis = 1), np.concatenate((y_left, y_right), axis = 1), np.concatenate((z_left, z_right), axis = 1), 'k', 0.5)
+
 
     # Plot start and goal points
-    ax.scatter(start[0], start[1], start[2], color = 'b')
-    ax.scatter(goal[0], goal[1], goal[2], color = 'g')
+
+    # DRONE
+    # ax.scatter(start[0], start[1], start[2], color = 'b')
+    # ax.scatter(goal[0], goal[1], goal[2], color = 'g')
+
+    # ROVER
+    ax.scatter(start[0], start[1], 0.5, color = 'b')
+    ax.scatter(goal[0], goal[1], 0.5, color = 'g')
 
     # Plot goal region
-    # plot_rectangular_prism(ax, np.array([9.0, 11.0]), np.array([8.0, 10.0]), np.array([3.0, 5.0]), 'g', 0.2)
-    plot_rectangular_prism(ax, np.array([8.5, 10.5]), np.array([7.5, 9.5]), np.array([3.5, 5.5]), 'g', 0.2)
+
+    # DRONE
+    # plot_rectangular_prism(ax, np.array([8.5, 10.5]), np.array([7.5, 9.5]), np.array([3.5, 5.5]), 'g', 0.2)
+
+    # ROVER
+    plot_rectangular_prism(ax, np.array([[8.5, 10.5]]), np.array([[7.5, 9.5]]), np.array([[0.0, 2.0]]), 'g', 0.2)
 
     # Plot obstacles    
-    plot_rectangular_prism(ax, np.array([2.0, 4.0]), np.array([2.0, 4.0]), np.array([0.0, 2.0]), 'r', 0.2)
-    plot_rectangular_prism(ax, np.array([4.0, 6.0]), np.array([4.0, 6.0]), np.array([8.0, 10.0]), 'r', 0.2)
+    plot_rectangular_prism(ax, np.array([[2.0, 4.0]]), np.array([[2.0, 4.0]]), np.array([[0.0, 2.0]]), 'r', 0.2)
+    plot_rectangular_prism(ax, np.array([[4.0, 6.0]]), np.array([[4.0, 6.0]]), np.array([[8.0, 10.0]]), 'r', 0.2)
 
     # Label plot and axes
-    ax.set_title('Quadrotor Trajectory')
+    # ax.set_title('Quadrotor Trajectory')
+    ax.set_title('Rover Trajectory')
     ax.set_xlabel('x')
     ax.set_ylabel('y')
     ax.set_zlabel('z')
