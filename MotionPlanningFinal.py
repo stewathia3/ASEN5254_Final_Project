@@ -1,3 +1,18 @@
+###############################################################################
+# Filename: MotionPlanningFinal.py
+# Author(s): Riana Gagnon, Sanjana Tewathia
+#
+# ASEN 5254, Fall 2022
+#
+# References/Acknowledgements:
+#   - 
+# 
+###############################################################################
+
+
+#-----------------------------------------------------------------------------#
+# Import Statements
+#-----------------------------------------------------------------------------#
 import numpy as np
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
@@ -7,6 +22,25 @@ import hppfcl as fcl
 
 ## ODE fix later 
 
+
+#-----------------------------------------------------------------------------#
+# Classes
+#-----------------------------------------------------------------------------#
+
+#-----------------------------------------------------------------------------#
+# Class:    Node
+# Purpose:  Node objects are Nodes that represent the vertices in the tree.
+#
+# Attributes/Properties:
+#   - Name:             int- vertex number/name (Ex. 'v0' or 0) (goal = -1)
+#   - Point:            np.array- the final state of the agent
+#   - Parent:           Node- the parent node or None
+#   - DistFromParent:   double- distance of current vertex from goal
+#   - Trajectory:       np.array- the ode trajectory from the start to end state
+#
+# Functions:
+#   - __init__: the constructor
+#-----------------------------------------------------------------------------#
 class Node:
     def __init__(self, name, point, parent, DistFromParent,trajectory):
         self.name = name
@@ -15,11 +49,44 @@ class Node:
         self.DistFromParent = DistFromParent
         self.trajectory = trajectory
         
-        
+
+#-----------------------------------------------------------------------------#
+# Class:    Edge
+# Purpose:  Edge objects that connect the string vertices in graphs.
+#
+# Attributes/Properties:
+#   - v1:           Node- the first vertex (start)
+#   - v2:           Node- the second vertex (next)
+#   - trajectory:   np.array- the ode trajectory from the start to end state
+#
+# Functions:
+#   - __init__: the constructor
+#-----------------------------------------------------------------------------#
 class Edge:
-    def __init__(self, trajectory):
+    def __init__(self, v1, v2, trajectory):
+        self.v1 = v1
+        self.v2 = v2
         self.trajectory = trajectory
 
+#-----------------------------------------------------------------------------#
+# Functions/Methods
+#-----------------------------------------------------------------------------#
+
+
+#-----------------------------------------------------------------------------#
+# Function: DroneDynamics
+# Purpose:  ODE function for the ode45 integrator for the drone's dynamics.
+#
+# Inputs:
+#   - t:        int- required input for ode integrator
+#   - state:    np.array- 6x1 current state of the drone
+#   - u1:       double- control input for omega angular acceleration
+#   - u2:       double- control input for alpha angular acceleration
+#   - u3:       double- control input for linear acceleration
+#
+# Outputs:
+#   - next_state: np.array- 6x1 next state of the drone
+#-----------------------------------------------------------------------------#
 def DroneDynamics(t,state,u1,u2,u3): #ode function
     
     x,y,z,psi,theta,v = state
@@ -35,6 +102,20 @@ def DroneDynamics(t,state,u1,u2,u3): #ode function
 
     return [xdot,ydot,zdot,psidot,thetadot,vdot]
 
+
+#-----------------------------------------------------------------------------#
+# Function: RoverDynamics
+# Purpose:  ODE function for the ode45 integrator for the rover's dynamics.
+#
+# Inputs:
+#   - t:        int- required input for ode integrator
+#   - state:    np.array- 6x1 current state of the rover
+#   - uv:       double- control input for linear acceleration
+#   - up:       double- control input for theta angular acceleration
+#
+# Outputs:
+#   - next_state: np.array- 6x1 next state of the rover
+#-----------------------------------------------------------------------------#
 def RoverDynamics(t,state,uv,up): #ode function
     
     x,y,theta = state
@@ -48,6 +129,17 @@ def RoverDynamics(t,state,uv,up): #ode function
     return [xdot,ydot,thetadot]
 
 
+#-----------------------------------------------------------------------------#
+# Function: generateNode
+# Purpose:  ODE function for the ode45 integrator for the rover's dynamics.
+#
+# Inputs:
+#   - Q:        double- probability for introducing goal bias
+#   - q_goal:   np.array- 6x1 goal state of the agent
+#
+# Outputs:
+#   - q_rand:   np.array- 6x1 sampled/goal-biased state of the agent
+#-----------------------------------------------------------------------------#
 def generateNode(Q,q_goal): #generate 6 state 
     
     chance = np.random.uniform(0,1,1)
@@ -82,7 +174,6 @@ def generateNode(Q,q_goal): #generate 6 state
         # q_rand = [x,y,z,p,ta,v,xr,yr,tr]
         
         
-        
     elif chance >= Q:
         q_rand = q_goal
         
@@ -90,6 +181,20 @@ def generateNode(Q,q_goal): #generate 6 state
 
 
 
+#-----------------------------------------------------------------------------#
+# Function: GenerateTrajectory
+# Purpose:  Function to generate a trajectory between two states that gets as
+#           close as possible to the inputted new_state with random control
+#           inputs.
+#
+# Inputs:
+#   - state:        np.array- 6x1 initial state of the agent (starting point)
+#   - new_state:    np.array- 6x1 new sampled/goal-biased state of the agent
+#
+# Outputs:
+#   - trajectories: np.array- 6x1 states of the agent for the best trajectory
+#   - time:         np.array- time array for the trajectory (from ode solver)
+#-----------------------------------------------------------------------------#
 def GenerateTrajectory(state,new_state): #state is qnear and new_state is q_rand
     
     m = 3 #generate 3 different random controls that extend from state which is qnear
@@ -124,8 +229,21 @@ def GenerateTrajectory(state,new_state): #state is qnear and new_state is q_rand
     
     return trajectories,time
 
-# Constraints
-def TrajectoryValid(trajectories,time): #does the trajectory work?
+#-----------------------------------------------------------------------------#
+# Function: TrajectoryValid
+# Purpose:  Function to check if a generated trajectory between two states is 
+#           valid, i.e., no state in the trajectory exceeds the dynamic
+#           constraints placed on the agent or collides with an obstacle
+#
+# Inputs:
+#   - trajectories: np.array- 6x1 states of the agent for the best trajectory
+#   - time:         np.array- time array for the trajectory (from ode solver)
+#   - obstacles:    list of fcl objects used for 3d collision checking
+#
+# Outputs:
+#   - boolean:  true if the trajectory is valid for all states, false if not         
+#-----------------------------------------------------------------------------#
+def TrajectoryValid(trajectories,time, obstacles = []): 
 
     #for single agent
     x,y,z,ta,v = trajectories[0,:],trajectories[1,:],trajectories[2,:],trajectories[4,:],trajectories[5,:]
@@ -134,25 +252,68 @@ def TrajectoryValid(trajectories,time): #does the trajectory work?
     # for multi agent
     # x,y,z,ta,v,xr,yr =  trajectories[0,:],trajectories[1,:],trajectories[2,:],trajectories[4,:],trajectories[5,:],trajectories[6,:],trajectories[7,:]
 
-    
+    # For drone
+    drone = fcl.Sphere(0.2)
 
-    
     #trajectory out of given constraints
-    for i in range(len(time)): 
-        # if (0<=xr[i]<=11) and (0<=yr[i]<=10):
-        # if (0<=x[i]<=11) and (0<=y[i]<=10) and (0<=z[i]<=10) and (-1<=v[i]<=1) and (-np.pi/3<=ta[i]<=np.pi/3) and (0<=xr[i]<=11) and (0<=yr[i]<=10):
-        if (0<=x[i]<=11) and (0<=y[i]<=10) and (0<=z[i]<=10) and (-1<=v[i]<=1) and (-np.pi/3<=ta[i]<=np.pi/3):
-            Valid = 1
+    # for i in range(len(time)): 
+    #     # if (0<=xr[i]<=11) and (0<=yr[i]<=10):
+    #     # if (0<=x[i]<=11) and (0<=y[i]<=10) and (0<=z[i]<=10) and (-1<=v[i]<=1) and (-np.pi/3<=ta[i]<=np.pi/3) and (0<=xr[i]<=11) and (0<=yr[i]<=10):
+    #     if (0<=x[i]<=11) and (0<=y[i]<=10) and (0<=z[i]<=10) and (-1<=v[i]<=1) and (-np.pi/3<=ta[i]<=np.pi/3):
+    #         Valid = 1
             
-        else:   
+    #     else:   
+    #         Valid = 0
+    #         break
+
+    Valid = 1 # Let's assume the trajectory is valid until proven invalid
+
+    for i in range(len(time)): 
+        if (0<=x[i]<=11) and (0<=y[i]<=10) and (0<=z[i]<=10) and (-1<=v[i]<=1) and (-np.pi/3<=ta[i]<=np.pi/3):
+        # if ( x[i] < 0 or x[i] > 11) or (y[i] < 0 or y[i] > 10) or (z[i] < 0 or z[i] > 10) or (abs(v[i]) > 1) or (abs(ta[i]) > np.pi/3):
+            Valid = 1
+        else:
             Valid = 0
             break
+
+        # Collision check
+        M_drone = fcl.Transform3f(np.eye(3), np.array([x[i], y[i], z[i]]))
+
+        req = fcl.CollisionRequest()
+        res = fcl.CollisionResult()
+
+        # loop over obstacles
+        for obs_i in range(len(obstacles)):
+
+            # create obstacle
+            obstacle = obstacles[obs_i][0]
+            M_obstacle = obstacles[obs_i][1]
+
+            
+            if fcl.collide(drone, M_drone, obstacle, M_obstacle, req, res):
+                Valid = 0
+                break
+
     
     return Valid
 
-def plt_sphere(list_center, list_radius):
+
+#-----------------------------------------------------------------------------#
+# Function: plt_sphere
+# Purpose:  Function to plot a sphere in 3D space to visualize the drone.
+#
+# Inputs:
+#   - ax:           matlplotlib axis object
+#   - list_center:  np.array- x,y,z location of the drone (its center point)
+#   - list_radius:  np.array- radii of the drone at each step
+#
+# Outputs:
+#   - None- just plots spheres in the matplotlib workspace figure
+#-----------------------------------------------------------------------------#
+def plt_sphere(ax, list_center, list_radius, color, alpha):
+
   for c, r in zip(list_center, list_radius):
-    ax = fig.gca(projection='3d')
+    # ax = fig.gca(projection='3d')
 
     # draw sphere
     u, v = np.mgrid[0:2*np.pi:50j, 0:np.pi:50j]
@@ -160,9 +321,30 @@ def plt_sphere(list_center, list_radius):
     y = r*np.sin(u)*np.sin(v)
     z = r*np.cos(v)
 
-    ax.plot_surface(x+c[0], y+c[1], z+c[2], color=np.random.choice(['g','b']), alpha=0.5*np.random.random()+0.5)
+    ax.plot_surface(x+c[0], y+c[1], z+c[2], color = color, alpha = alpha) # color=np.random.choice(['g','b']), alpha=0.5*np.random.random()+0.5)
 
-def create_rrt(start, goal,n, Q, plot_path):
+
+#-----------------------------------------------------------------------------#
+# Function: create_rrt
+# Purpose:  Implementation of a RRT planner.
+#
+# Inputs:
+#   - start:        np.array- start state vector
+#   - goal:         np.array- goal state vector
+#   - n:            int- maximum number of iterations the algorithm should run
+#   - Q:            double- goal bias probability (how often bias should occur)
+#   - obstacles:    list of all obstacles in the workspace
+#   - plot_path:    boolean- true if a path should be plotted, false if not
+#
+# Outputs:
+#   - solution_found:   boolean, true if a solution was found, false if not
+#   - path:             np.array- vector of nodes for all states in final path
+#   - path_length:      double- length of the path
+#   - tree_size:        int- the size of the tree, or the number of nodes
+#   - kino_path:        np.array- vector of states for all sub-trajectories in
+#                       final path
+#-----------------------------------------------------------------------------#
+def create_rrt(start, goal, n, Q, plot_path = False, obstacles = []):
 
 
     # STEP 1: Initialize tree with root/start node
@@ -208,7 +390,7 @@ def create_rrt(start, goal,n, Q, plot_path):
         #get the trajectory of the sampled state
         trajectories,time =  GenerateTrajectory(state.point,new_state)
 
-        Valid = TrajectoryValid(trajectories,time)
+        Valid = TrajectoryValid(trajectories,time, obstacles)
 
         # Check if q_new collides with obstacles
         if Valid:
@@ -258,6 +440,23 @@ y_goal = [8,9]
 z_goal = [4,5]
 v_goal = [-1/20,1/20]
 
+
+#-----------------------------------------------------------------------------#
+# Function: plot_rectangular_prism
+# Purpose:  Function to plot a rectangular prism in 3D space to visualize the
+#           rover and stalagmite/stalactite obstacles.
+#
+# Inputs:
+#   - ax:       matlplotlib axis object
+#   - x_bounds: list- the x limits/bounds for the prism
+#   - y_bounds: list- the y limits/bounds for the prism
+#   - z_bounds: list- the z limits/bounds for the prism
+#   - color:    string- the color of the prism's faces
+#   - alpha:    double- the transparency of the prism's faces
+#
+# Outputs:
+#   - None- just plots spheres in the matplotlib workspace figure
+#-----------------------------------------------------------------------------#
 def plot_rectangular_prism(ax, x_bounds, y_bounds, z_bounds, color, alpha):
 
     # Vertices
@@ -311,45 +510,61 @@ def plot_rectangular_prism(ax, x_bounds, y_bounds, z_bounds, color, alpha):
 if __name__ == '__main__':
 
     #-----------------------------------------------------------------------------#
-    # Exercise 2 (a): Planning problem of HW2 Exercise 2 (W1)
+    # Set up inputs for the workspace
     #-----------------------------------------------------------------------------#
     #single agent tests
-    xr,yr,tr = 1,1,0
-    x,y,z,psi,theta,v = 1,1,1,0,0,0
-    start = [x,y,z,psi,theta,v]
-    # start = [xr,yr,tr]
-    
-    #multi agent 
-    #start = [x,y,z,psi,theta,v,xr,yr,tr]
-    
-    #hypothetical goal state that will lead to goal region
-    #single agent tests
-    goal = [9.5,8.5,4.5,np.random.uniform(-np.pi/2,np.pi/2),0,0]
-    #goal = [9.5,8.5,0]
 
-    #multi agent 
+    # Initial rover location (x,y) and heading (t)
+    xr,yr,tr = 1,1,0
+
+    # Initial drone location (x, y, z), orientation (psi, theta), and velocity (v)
+    x,y,z,psi,theta,v = 1,1,1,0,0,0
+
+    # Obstacles                                                                       x     y    z
+                # Stalagmite (on ground)
+    obstacles = [[fcl.Box(np.array([2, 2, 2])), fcl.Transform3f(np.eye(3), np.array([3.0, 3.0, 1.0]))],
+                # Stalactite (on ceiling)
+                 [fcl.Box(np.array([2, 2, 2])), fcl.Transform3f(np.eye(3), np.array([5.0, 5.0, 9.0]))]]
+
+    # For single agents:
+
+    # ROVER
+    # start = [xr,yr,tr] 
+    # goal = [9.5,8.5,0]
+
+    # DRONE
+    start = [x,y,z,psi,theta,v] 
+    goal = [9.5,8.5,4.5,np.random.uniform(-np.pi/2,np.pi/2),0,0]
+    
+    # For multi-agent, or [DRONE, ROVER]:
+
+    # start = [x,y,z,psi,theta,v,xr,yr,tr]
     # goal = [9.5,8.5,4.5,np.random.uniform(-np.pi/2,np.pi/2),0,0,9.5,8.5,0]
 
-
+    # number of iterations, n
     n = 5000
+    
+    # goal bias probability
     p_goal = 0.05
+
+    # random sample state probability
     Q = 1-p_goal
 
     #-----------------------------------------------------------------------------#
-    # Run this section to generate 1 plot 
-    # -> basically, 1 plot of the workspace, RRT, and path
-    # -> This is the DEFAULT
+    # Run the RRT planner on these inputs
     #-----------------------------------------------------------------------------#
 
-    solution_found, path, path_length, tree_size,kino_path = create_rrt(start, goal, n, Q, True)
+    solution_found, path, path_length, tree_size,kino_path = create_rrt(start, goal, n, Q, True, obstacles)
     
-    # print(solution_found)
 
     #kinopath is the kinodynamic path
     x,y,z,p,ta,v = np.array([]),np.array([]),np.array([]),np.array([]),np.array([]),np.array([])
     xr,yr,tr = np.array([]),np.array([]),np.array([])
 
+    # Extract each state from the kinodynamic solution path
     for i in range(len(kino_path)):
+
+        # DRONE
         x = np.append(x,kino_path[i][0])
         y = np.append(y,kino_path[i][1])
         z= np.append(z,kino_path[i][2])
@@ -357,11 +572,15 @@ if __name__ == '__main__':
         ta = np.append(ta,kino_path[i][4])
         v = np.append(v,kino_path[i][5])
 
+        # ROVER
         #xr = np.append(xr,kino_path[i][0]) # or index 6
         #yr = np.append(yr,kino_path[i][1]) # or index 7
         # tr = np.append(tr,kino_path[i][2]) #or index at 8 
 
-    #zr = np.zeros(len(xr)) #this will be for plotting on the same graph 
+    # Array of constant z values to plot the rover on the same 3D plot
+    # zr = np.zeros(len(xr)) #this will be for plotting on the same graph 
+
+    # Reorder the DRONE states to plot spheres
     list_radius = [.2]*len(x)
     list_center = []
 
@@ -371,19 +590,35 @@ if __name__ == '__main__':
     fig = plt.figure()
     ax = plt.axes(projection='3d')
     ax.plot(x,y,z)
-    #take this out to see the point robot -- it makes the graphing really slow
-    plt_sphere(list_center, list_radius) 
+
+    # Plot spheres to represent the drone- only 30 spheres will be plotted along the path (too slow otherwise)
+    if len(list_center) > 30:
+        plt_sphere(ax, list_center[::math.floor(len(list_center) / 30.0)], list_radius, 'k', 0.7) 
+    else:
+        plt_sphere(ax, list_center, list_radius, 'k', 0.7) 
 
     # Plot start and goal points
     ax.scatter(start[0], start[1], start[2], color = 'b')
     ax.scatter(goal[0], goal[1], goal[2], color = 'g')
 
     # Plot goal region
-    plot_rectangular_prism(ax, np.array([9.0, 11.0]), np.array([8.0, 10.0]), np.array([3.0, 5.0]), 'g', 0.2)
+    # plot_rectangular_prism(ax, np.array([9.0, 11.0]), np.array([8.0, 10.0]), np.array([3.0, 5.0]), 'g', 0.2)
+    plot_rectangular_prism(ax, np.array([8.5, 10.5]), np.array([7.5, 9.5]), np.array([3.5, 5.5]), 'g', 0.2)
 
+    # Plot obstacles    
+    plot_rectangular_prism(ax, np.array([2.0, 4.0]), np.array([2.0, 4.0]), np.array([0.0, 2.0]), 'r', 0.2)
+    plot_rectangular_prism(ax, np.array([4.0, 6.0]), np.array([4.0, 6.0]), np.array([8.0, 10.0]), 'r', 0.2)
+
+    # Label plot and axes
     ax.set_title('Quadrotor Trajectory')
     ax.set_xlabel('x')
     ax.set_ylabel('y')
     ax.set_zlabel('z')
 
+    # Set workspace bounds
+    ax.set_xlim(0.0, 15.0)
+    ax.set_ylim(0.0, 15.0)
+    ax.set_zlim(0.0, 10.0)
+
+    # Show the plot
     plt.show()
