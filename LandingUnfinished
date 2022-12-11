@@ -289,7 +289,7 @@ def GenerateTrajectory(state,new_state,mode): #state is qnear and new_state is q
 
         if mode == 0:
             for j in range(np.shape(traj)[1]): # [:,-1]
-                traj[0:2, j] = traj[6:7, j]
+                traj[0:2, j] = traj[6:8, j]
                 traj[2, j] = 1.2
                 traj[3, j] = 0.0
                 traj[4, j] = 0.0
