@@ -191,8 +191,8 @@ def MultiAgentDynamics(t,state,u1,u2,u3,uv,up,mode):
 
         xdot = xrdot
         ydot = yrdot
-        zdot = 1.2 # z
-        psidot = psi
+        zdot = 0.0 #1.2 # z
+        psidot = 0 # 0.0 # psi
         thetadot = 0
         vdot = 0
 
@@ -286,6 +286,15 @@ def GenerateTrajectory(state,new_state,mode): #state is qnear and new_state is q
         result_solve_ivp = solve_ivp(MultiAgentDynamics, t_span, state,args=control_multi, method = 'RK45')
     
         traj = result_solve_ivp.y
+
+        if mode == 0:
+            for j in range(np.shape(traj)[1]): # [:,-1]
+                traj[0:2, j] = traj[6:7, j]
+                traj[2, j] = 1.2
+                traj[3, j] = 0.0
+                traj[4, j] = 0.0
+                traj[5, j] = 0.0
+
         best_con = math.dist(new_state,traj[:,-1])
         if best_con < min_dist:
             min_dist = best_con
