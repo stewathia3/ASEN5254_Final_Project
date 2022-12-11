@@ -173,15 +173,15 @@ def MultiAgentDynamics(t,state,u1,u2,u3,uv,up):
 # Outputs:
 #   - q_rand:   np.array- 6x1 sampled/goal-biased state of the agent
 #-----------------------------------------------------------------------------#
-def generateNode(Q,q_goal): #generate 6 state 
+def generateNode(Q,q_goal, W_bounds): #generate 6 state 
     
     chance = np.random.uniform(0,1,1)
     y_min = 0
-    y_max = 15
+    y_max = W_bounds[1]
     x_min = 0
-    x_max = 15
+    x_max = W_bounds[0]
     z_min = 0
-    z_max = 15
+    z_max = W_bounds[2]
     v_min = -1
     v_max = 1
     theta_min = -np.pi/3
@@ -283,7 +283,7 @@ def GenerateTrajectory(state,new_state): #state is qnear and new_state is q_rand
 # Outputs:
 #   - boolean:  true if the trajectory is valid for all states, false if not         
 #-----------------------------------------------------------------------------#
-def TrajectoryValid(trajectories,time, obstacles = []): 
+def TrajectoryValid(trajectories,time, W_bounds, obstacles = []): 
 
     #for single agent
     # x,y,z,ta,v = trajectories[0,:],trajectories[1,:],trajectories[2,:],trajectories[4,:],trajectories[5,:]
@@ -339,7 +339,9 @@ def TrajectoryValid(trajectories,time, obstacles = []):
 
     for i in range(len(time)): 
         # if (0<=xr[i]<=11) and (0<=yr[i]<=10):
-        if (0<=x[i]<=11) and (0<=y[i]<=10) and (0<=z[i]<=10) and (-1<=v[i]<=1) and (-np.pi/3<=ta[i]<=np.pi/3) and (0<=xr[i]<=11) and (0<=yr[i]<=10):
+        if (0 <= x[i] <= W_bounds[0]) and (0 <= y[i] <= W_bounds[1]) and (0 <= z[i] <= W_bounds[2]) and \
+            (-1<=v[i]<=1) and (-np.pi/3<=ta[i]<=np.pi/3) and \
+            (0 <= xr[i] <= W_bounds[0]) and (0 <= yr[i] <= W_bounds[1]):
             Valid = 1
         else:
             Valid = 0
@@ -421,7 +423,7 @@ def plt_sphere(ax, list_center, list_radius, color, alpha):
 #   - kino_path:        np.array- vector of states for all sub-trajectories in
 #                       final path
 #-----------------------------------------------------------------------------#
-def create_rrt(start, goal, n, Q, rover_parked, drone_parked, plot_path = False, obstacles = []):
+def create_rrt(W_bounds, start, goal, n, Q, rover_parked, drone_parked, plot_path = False, obstacles = []):
 
 
     # STEP 1: Initialize tree with root/start node
@@ -437,18 +439,29 @@ def create_rrt(start, goal, n, Q, rover_parked, drone_parked, plot_path = False,
     x,y,z,p,ta,v,xr,yr,tr = start
     solution_found = True
 
+    x_goal_bounds = [goal[0] - 1.0, goal[0] + 1.0]
+    y_goal_bounds = [goal[1] - 1.0, goal[1] + 1.0]
+    z_goal_bounds = [goal[2] - 1.0, goal[2] + 1.0]
+    xr_goal_bounds = [goal[6] - 1.0, goal[6] + 1.0]
+    yr_goal_bounds = [goal[7] - 1.0, goal[7] + 1.0]
+
     # STEP 2: Loop until n samples created or goal reached
     #multi agent
     # while (len(tree) < n) and not(9<=x<=11 and 8<=y<=10 and 3<=z<=5 and -1/20<=v<=1/20 and 9<=xr<=11 and 8<=yr<=10):
 
     #single agent 
     # while (len(tree) < n) and not(9<=xr<=11 and 8<=yr<=10):
-    while (len(tree) < n) and not(9<=x<=11 and 8<=y<=10 and 3<=z<=5 and -1/20<=v<=1/20 and 9<=xr<=11 and 8<=yr<=10):
+    while (len(tree) < n) and not(x_goal_bounds[0]<=x<=x_goal_bounds[1] and \
+                                  y_goal_bounds[0]<=y<=y_goal_bounds[1] and \
+                                  z_goal_bounds[0]<=z<=z_goal_bounds[1] and \
+                                  -1/20<=v<=1/20 and \
+                                  xr_goal_bounds[0]<=xr<=x_goal_bounds[1] and \
+                                  yr_goal_bounds[0]<=yr<=yr_goal_bounds[1]):
 
         # print(len(tree))
         # print(math.dist(curr_node.point, goal))
         
-        new_state = generateNode(Q,goal)
+        new_state = generateNode(Q,goal, W_bounds)
 
         if rover_parked:
             new_state[6:] = rover_state_last
@@ -474,7 +487,7 @@ def create_rrt(start, goal, n, Q, rover_parked, drone_parked, plot_path = False,
         #get the trajectory of the sampled state
         trajectories,time =  GenerateTrajectory(state.point,new_state)
 
-        Valid = TrajectoryValid(trajectories,time, obstacles)
+        Valid = TrajectoryValid(trajectories,time, W_bounds, obstacles)
 
         # Check if q_new collides with obstacles
         if Valid:
@@ -488,11 +501,13 @@ def create_rrt(start, goal, n, Q, rover_parked, drone_parked, plot_path = False,
             #multi agent
             x,y,z,p,ta,v,xr,yr,tr = x_new
 
-            if drone_parked == False and 9<=x<=11 and 8<=y<=10 and 3<=z<=5 and -1/20<=v<=1/20:
+            if drone_parked == False and x_goal_bounds[0]<=x<=x_goal_bounds[1] and \
+                                         y_goal_bounds[0]<=y<=y_goal_bounds[1] and \
+                                         z_goal_bounds[0]<=z<=z_goal_bounds[1] and -1/20<=v<=1/20:
                 drone_parked = True
                 drone_state_last = x_new[0:6]
 
-            if rover_parked == False and 9<=xr<=11 and 8<=yr<=10:
+            if rover_parked == False and xr_goal_bounds[0]<=xr<=xr_goal_bounds[1] and yr_goal_bounds[0]<=yr<=yr_goal_bounds[1]:
                 rover_parked = True
                 rover_state_last = x_new[6:]
 
@@ -501,12 +516,14 @@ def create_rrt(start, goal, n, Q, rover_parked, drone_parked, plot_path = False,
            
             tree.append(curr_node) #appends an object
 
-    if len(tree)>=n:
-        solution_found = False
-
     path = []
     kino_path = []
     path_length = 0.0
+
+    if len(tree)>=n:
+        solution_found = False
+
+        return solution_found, path, path_length, len(tree),kino_path
 
     # STEP 3: Create path from goal to start going up the tree
     if solution_found == True:
@@ -614,6 +631,8 @@ if __name__ == '__main__':
     #-----------------------------------------------------------------------------#
     #single agent tests
 
+    W_bounds = [15.0, 15.0, 10.0] # x, y, z
+
     # Initial rover location (x,y) and heading (t)
     xr,yr,tr = 1,1,0
 
@@ -625,6 +644,15 @@ if __name__ == '__main__':
     obstacles = [[fcl.Box(np.array([2, 2, 2])), fcl.Transform3f(np.eye(3), np.array([1.0, 5.0, 1.0]))],
 
                 [fcl.Box(np.array([2, 2, 2])), fcl.Transform3f(np.eye(3), np.array([14.0, 5.0, 1.0]))],
+                
+                [fcl.Box(np.array([2, 2, 2])), fcl.Transform3f(np.eye(3), np.array([5.0, 12.0, 1.0]))],
+                
+                [fcl.Box(np.array([2, 2, 2])), fcl.Transform3f(np.eye(3), np.array([10.0, 12.0, 1.0]))],
+                
+                [fcl.Box(np.array([2, 2, 2])), fcl.Transform3f(np.eye(3), np.array([5.0, 12.0, 9.0]))],
+                
+                [fcl.Box(np.array([2, 2, 2])), fcl.Transform3f(np.eye(3), np.array([10.0, 12.0, 9.0]))],
+
                 # Stalactites (on ceiling)
                  [fcl.Box(np.array([15, 2, 8])), fcl.Transform3f(np.eye(3), np.array([7.5, 5.0, 6.0]))]]
 
@@ -641,14 +669,27 @@ if __name__ == '__main__':
     # For multi-agent, or [DRONE, ROVER]:
 
     start = [x,y,z,psi,theta,v,xr,yr,tr]
-    goal = [9.5,8.5,4.5,np.random.uniform(-np.pi/2,np.pi/2),0,0,9.5,8.5,0]
+
+    goal1 = [7.5,8.5,4.5,np.random.uniform(-np.pi/2,np.pi/2),0,0,7.5,8.5,0]
+
+    
+    goal2 = [14.0,10.0,7.0,np.random.uniform(-np.pi/2,np.pi/2),0,0,1.0,10.0,0]
+
+    
+    goal3 = [7.5,14.0,4.5,np.random.uniform(-np.pi/2,np.pi/2),0,0,7.5,14.0,0]
+
+    goals = [goal1, goal2, goal3]
+
+
     # goal = [10,9,4,np.random.uniform(-np.pi/2,np.pi/2),0,0,10,9,0]
 
     # number of iterations, n
     n = 5000
+    # n = 7500
     
     # goal bias probability
-    p_goal = 0.05
+    # p_goal = 0.05
+    p_goal = 0.10
 
     # random sample state probability
     Q = 1-p_goal
@@ -657,51 +698,238 @@ if __name__ == '__main__':
     # Run the RRT planner on these inputs
     #-----------------------------------------------------------------------------#
 
+    solution_found1 = False
+
+    tries1 = 0
+
+    print("Going to goal 1")
+
+    while not solution_found1:
                                                                                     # drone_parked, rover_parked, plot_path
-    solution_found, path, path_length, tree_size,kino_path = create_rrt(start, goal, n, Q, False, False, True, obstacles)
-    
+        solution_found1, path1, path_length1, tree_size1,kino_path1 = create_rrt(W_bounds, start, goal1, n, Q, False, False, True, obstacles)
+
+        tries1 += 1
+
+        print(tries1)
+
+    print(f'Size of tree was {0}', tree_size1)
 
     #kinopath is the kinodynamic path
-    x,y,z,p,ta,v = np.array([]),np.array([]),np.array([]),np.array([]),np.array([]),np.array([])
-    xr,yr,tr = np.array([]),np.array([]),np.array([])
+    x1,y1,z1,p1,ta1,v1 = np.array([]),np.array([]),np.array([]),np.array([]),np.array([]),np.array([])
+    xr1,yr1,tr1 = np.array([]),np.array([]),np.array([])
 
     # Extract each state from the kinodynamic solution path
-    for i in range(len(kino_path)):
+    for i in range(len(kino_path1)):
 
         # DRONE
-        x = np.append(x,kino_path[i][0])
-        y = np.append(y,kino_path[i][1])
-        z= np.append(z,kino_path[i][2])
-        p = np.append(p,kino_path[i][3])
-        ta = np.append(ta,kino_path[i][4])
-        v = np.append(v,kino_path[i][5])
+        x1 = np.append(x1,kino_path1[i][0])
+        y1 = np.append(y1,kino_path1[i][1])
+        z1= np.append(z1,kino_path1[i][2])
+        p1 = np.append(p1,kino_path1[i][3])
+        ta1 = np.append(ta1,kino_path1[i][4])
+        v1 = np.append(v1,kino_path1[i][5])
 
         # ROVER
         # xr = np.append(xr,kino_path[i][0]) # or index 6
         # yr = np.append(yr,kino_path[i][1]) # or index 7
         # tr = np.append(tr,kino_path[i][2]) #or index at 8 
 
-        xr = np.append(xr,kino_path[i][6]) # or index 6
-        yr = np.append(yr,kino_path[i][7]) # or index 7
-        tr = np.append(tr,kino_path[i][8]) #or index at 8 
+        xr1 = np.append(xr1,kino_path1[i][6]) # or index 6
+        yr1 = np.append(yr1,kino_path1[i][7]) # or index 7
+        tr1 = np.append(tr1,kino_path1[i][8]) #or index at 8 
 
     # Array of constant z values to plot the rover on the same 3D plot
-    zr = 0.5 * np.ones(len(xr)) #this will be for plotting on the same graph 
+    zr1 = 0.5 * np.ones(len(xr1)) #this will be for plotting on the same graph 
+
+    print("Going to goal 2")
+
+    start2 = kino_path1[-1][:,-1]
+
+    solution_found2 = False
+    
+    tries2 = 0
+
+    while not solution_found2:
+                                                                                    # drone_parked, rover_parked, plot_path
+        solution_found2, path2, path_length2, tree_size2,kino_path2 = create_rrt(W_bounds, start2, goal2, n, Q, False, False, True, obstacles)
+
+        tries2 += 1
+
+        print(tries2)
+
+    print(f'Size of tree was {0}', tree_size2)
+
+    #kinopath is the kinodynamic path
+    x2,y2,z2,p2,ta2,v2 = np.array([]),np.array([]),np.array([]),np.array([]),np.array([]),np.array([])
+    xr2,yr2,tr2 = np.array([]),np.array([]),np.array([])
+
+    # Extract each state from the kinodynamic solution path
+    for i in range(len(kino_path2)):
+
+        # DRONE
+        x2 = np.append(x2,kino_path2[i][0])
+        y2 = np.append(y2,kino_path2[i][1])
+        z2= np.append(z2,kino_path2[i][2])
+        p2 = np.append(p2,kino_path2[i][3])
+        ta2 = np.append(ta2,kino_path2[i][4])
+        v2 = np.append(v2,kino_path2[i][5])
+
+        # ROVER
+        # xr = np.append(xr,kino_path[i][0]) # or index 6
+        # yr = np.append(yr,kino_path[i][1]) # or index 7
+        # tr = np.append(tr,kino_path[i][2]) #or index at 8 
+
+        xr2 = np.append(xr2,kino_path2[i][6]) # or index 6
+        yr2 = np.append(yr2,kino_path2[i][7]) # or index 7
+        tr2 = np.append(tr2,kino_path2[i][8]) #or index at 8 
+
+    # Array of constant z values to plot the rover on the same 3D plot
+    zr2 = 0.5 * np.ones(len(xr2)) #this will be for plotting on the same graph 
+
+    print("Going to goal 3")
+
+    start3 = kino_path2[-1][:,-1]
+
+    solution_found3 = False
+    
+    tries3 = 0
+
+    while not solution_found3:
+                                                                                    # drone_parked, rover_parked, plot_path
+        solution_found3, path3, path_length3, tree_size3,kino_path3 = create_rrt(W_bounds, start3, goal3, n, Q, False, False, True, obstacles)
+
+        tries3 += 1
+
+        print(tries3)
+
+    print(f'Size of tree was {0}', tree_size3)
+
+    #kinopath is the kinodynamic path
+    x3,y3,z3,p3,ta3,v3 = np.array([]),np.array([]),np.array([]),np.array([]),np.array([]),np.array([])
+    xr3,yr3,tr3 = np.array([]),np.array([]),np.array([])
+
+    # Extract each state from the kinodynamic solution path
+    for i in range(len(kino_path3)):
+
+        # DRONE
+        x3 = np.append(x3,kino_path3[i][0])
+        y3 = np.append(y3,kino_path3[i][1])
+        z3 = np.append(z3,kino_path3[i][2])
+        p3 = np.append(p3,kino_path3[i][3])
+        ta3 = np.append(ta3,kino_path3[i][4])
+        v3 = np.append(v3,kino_path3[i][5])
+
+        # ROVER
+        # xr = np.append(xr,kino_path[i][0]) # or index 6
+        # yr = np.append(yr,kino_path[i][1]) # or index 7
+        # tr = np.append(tr,kino_path[i][2]) #or index at 8 
+
+        xr3 = np.append(xr3,kino_path3[i][6]) # or index 6
+        yr3 = np.append(yr3,kino_path3[i][7]) # or index 7
+        tr3 = np.append(tr3,kino_path3[i][8]) #or index at 8 
+
+    # Array of constant z values to plot the rover on the same 3D plot
+    zr3 = 0.5 * np.ones(len(xr3)) #this will be for plotting on the same graph 
+
+    
+
+    # kino_path = kino_path1 + kino_path2 + kino_path3
+
+    # #kinopath is the kinodynamic path
+    # x,y,z,p,ta,v = np.array([]),np.array([]),np.array([]),np.array([]),np.array([]),np.array([])
+    # xr,yr,tr = np.array([]),np.array([]),np.array([])
+
+    # # Extract each state from the kinodynamic solution path
+    # for i in range(len(kino_path)):
+
+    #     # DRONE
+    #     x = np.append(x,kino_path[i][0])
+    #     y = np.append(y,kino_path[i][1])
+    #     z= np.append(z,kino_path[i][2])
+    #     p = np.append(p,kino_path[i][3])
+    #     ta = np.append(ta,kino_path[i][4])
+    #     v = np.append(v,kino_path[i][5])
+
+    #     # ROVER
+    #     # xr = np.append(xr,kino_path[i][0]) # or index 6
+    #     # yr = np.append(yr,kino_path[i][1]) # or index 7
+    #     # tr = np.append(tr,kino_path[i][2]) #or index at 8 
+
+    #     xr = np.append(xr,kino_path[i][6]) # or index 6
+    #     yr = np.append(yr,kino_path[i][7]) # or index 7
+    #     tr = np.append(tr,kino_path[i][8]) #or index at 8 
+
+    # # Array of constant z values to plot the rover on the same 3D plot
+    # zr = 0.5 * np.ones(len(xr)) #this will be for plotting on the same graph 
+
+    # # Reorder the states to plot spheres/rectangular prisms along path
+    # drone_radius = [.2]*len(x)
+    # rover_side_length = [1] * len(x)
+
+    # list_center = []
+
+    # for i in range(len(x)):
+    #     list_center.insert(0,(x[i],y[i],z[i]))
+
+    # fig = plt.figure()
+    # ax = plt.axes(projection='3d')
+
+    # ax.plot(x,y,z)
+    # ax.plot(xr,yr,zr)
+
+    # # Plot spheres to represent the drone- only 30 spheres will be plotted along the path (too slow otherwise)
+    # if len(list_center) > 30:
+    # # if len(xr) > 30:
+    #     # DRONE
+    #     plt_sphere(ax, list_center[::math.floor(len(list_center) / 30.0)], drone_radius, 'k', 0.7) 
+
+    #     # ROVER
+    #     x_left = xr[::math.floor(len(xr) / 15.0)] - 0.5
+    #     x_right = xr[::math.floor(len(xr) / 15.0)] + 0.5
+
+    #     y_left = yr[::math.floor(len(yr) / 15.0)] - 0.5
+    #     y_right = yr[::math.floor(len(yr) / 15.0)] + 0.5
+
+    #     z_left = zr[::math.floor(len(zr) / 15.0)] - 0.5
+    #     z_right = zr[::math.floor(len(zr) / 15.0)] + 0.5
+
+    #     plot_rectangular_prism(ax, np.concatenate((x_left.reshape(len(x_left), 1), x_right.reshape(len(x_right), 1)), axis = 1), \
+    #                                np.concatenate((y_left.reshape(len(y_left), 1), y_right.reshape(len(y_right), 1)), axis = 1), \
+    #                                np.concatenate((z_left.reshape(len(z_left), 1), z_right.reshape(len(z_right), 1)), axis = 1), 'k', 0.5)
+
+    # elif len(list_center) > 0:
+    #     # DRONE
+    #     plt_sphere(ax, list_center, drone_radius, 'k', 0.7) 
+
+    #     # ROVER
+    #     x_left = xr - 0.5
+    #     x_right = xr + 0.5
+
+    #     y_left = yr - 0.5
+    #     y_right = yr + 0.5
+
+    #     z_left = zr - 0.5
+    #     z_right = zr + 0.5
+
+    #     plot_rectangular_prism(ax, np.concatenate((x_left, x_right), axis = 1), np.concatenate((y_left, y_right), axis = 1), np.concatenate((z_left, z_right), axis = 1), 'k', 0.5)
+
 
     # Reorder the states to plot spheres/rectangular prisms along path
-    drone_radius = [.2]*len(x)
-    rover_side_length = [1] * len(x)
+
+    # Plot trajectory for task 1
+    drone_radius = [.2]*len(x1)
+    rover_side_length = [1] * len(x1)
 
     list_center = []
 
-    for i in range(len(x)):
-        list_center.insert(0,(x[i],y[i],z[i]))
+    for i in range(len(x1)):
+        list_center.insert(0,(x1[i],y1[i],z1[i]))
 
     fig = plt.figure()
     ax = plt.axes(projection='3d')
 
-    ax.plot(x,y,z)
-    ax.plot(xr,yr,zr)
+    ax.plot(x1,y1,z1, color = 'k')
+    ax.plot(xr1,yr1,zr1, color = 'k')
 
     # Plot spheres to represent the drone- only 30 spheres will be plotted along the path (too slow otherwise)
     if len(list_center) > 30:
@@ -710,14 +938,14 @@ if __name__ == '__main__':
         plt_sphere(ax, list_center[::math.floor(len(list_center) / 30.0)], drone_radius, 'k', 0.7) 
 
         # ROVER
-        x_left = xr[::math.floor(len(xr) / 15.0)] - 0.5
-        x_right = xr[::math.floor(len(xr) / 15.0)] + 0.5
+        x_left = xr1[::math.floor(len(xr1) / 15.0)] - 0.5
+        x_right = xr1[::math.floor(len(xr1) / 15.0)] + 0.5
 
-        y_left = yr[::math.floor(len(yr) / 15.0)] - 0.5
-        y_right = yr[::math.floor(len(yr) / 15.0)] + 0.5
+        y_left = yr1[::math.floor(len(yr1) / 15.0)] - 0.5
+        y_right = yr1[::math.floor(len(yr1) / 15.0)] + 0.5
 
-        z_left = zr[::math.floor(len(zr) / 15.0)] - 0.5
-        z_right = zr[::math.floor(len(zr) / 15.0)] + 0.5
+        z_left = zr1[::math.floor(len(zr1) / 15.0)] - 0.5
+        z_right = zr1[::math.floor(len(zr1) / 15.0)] + 0.5
 
         plot_rectangular_prism(ax, np.concatenate((x_left.reshape(len(x_left), 1), x_right.reshape(len(x_right), 1)), axis = 1), \
                                    np.concatenate((y_left.reshape(len(y_left), 1), y_right.reshape(len(y_right), 1)), axis = 1), \
@@ -728,44 +956,167 @@ if __name__ == '__main__':
         plt_sphere(ax, list_center, drone_radius, 'k', 0.7) 
 
         # ROVER
-        x_left = xr - 0.5
-        x_right = xr + 0.5
+        x_left = xr1 - 0.5
+        x_right = xr1 + 0.5
 
-        y_left = yr - 0.5
-        y_right = yr + 0.5
+        y_left = yr1 - 0.5
+        y_right = yr1 + 0.5
 
-        z_left = zr - 0.5
-        z_right = zr + 0.5
+        z_left = zr1 - 0.5
+        z_right = zr1 + 0.5
 
         plot_rectangular_prism(ax, np.concatenate((x_left, x_right), axis = 1), np.concatenate((y_left, y_right), axis = 1), np.concatenate((z_left, z_right), axis = 1), 'k', 0.5)
+
+
+    # Plot trajectory for task 2
+    drone_radius = [.2]*len(x2)
+    rover_side_length = [1] * len(x2)
+
+    list_center = []
+
+    for i in range(len(x2)):
+        list_center.insert(0,(x2[i],y2[i],z2[i]))
+
+    ax.plot(x2,y2,z2, color = 'm')
+    ax.plot(xr2,yr2,zr2, color = 'm')
+
+    # Plot spheres to represent the drone- only 30 spheres will be plotted along the path (too slow otherwise)
+    if len(list_center) > 30:
+    # if len(xr) > 30:
+        # DRONE
+        plt_sphere(ax, list_center[::math.floor(len(list_center) / 30.0)], drone_radius, 'm', 0.7) 
+
+        # ROVER
+        x_left = xr2[::math.floor(len(xr2) / 15.0)] - 0.5
+        x_right = xr2[::math.floor(len(xr2) / 15.0)] + 0.5
+
+        y_left = yr2[::math.floor(len(yr2) / 15.0)] - 0.5
+        y_right = yr2[::math.floor(len(yr2) / 15.0)] + 0.5
+
+        z_left = zr2[::math.floor(len(zr2) / 15.0)] - 0.5
+        z_right = zr2[::math.floor(len(zr2) / 15.0)] + 0.5
+
+        plot_rectangular_prism(ax, np.concatenate((x_left.reshape(len(x_left), 1), x_right.reshape(len(x_right), 1)), axis = 1), \
+                                   np.concatenate((y_left.reshape(len(y_left), 1), y_right.reshape(len(y_right), 1)), axis = 1), \
+                                   np.concatenate((z_left.reshape(len(z_left), 1), z_right.reshape(len(z_right), 1)), axis = 1), 'm', 0.5)
+
+    elif len(list_center) > 0:
+        # DRONE
+        plt_sphere(ax, list_center, drone_radius, 'm', 0.7) 
+
+        # ROVER
+        x_left = xr2 - 0.5
+        x_right = xr2 + 0.5
+
+        y_left = yr2 - 0.5
+        y_right = yr2 + 0.5
+
+        z_left = zr2 - 0.5
+        z_right = zr2 + 0.5
+
+        plot_rectangular_prism(ax, np.concatenate((x_left, x_right), axis = 1), np.concatenate((y_left, y_right), axis = 1), np.concatenate((z_left, z_right), axis = 1), 'm', 0.5)
+
+
+    # Plot trajectory for task 3
+    drone_radius = [.2]*len(x3)
+    rover_side_length = [1] * len(x3)
+
+    list_center = []
+
+    for i in range(len(x3)):
+        list_center.insert(0,(x3[i],y3[i],z3[i]))
+
+    ax.plot(x3,y3,z3, color = 'c')
+    ax.plot(xr3,yr3,zr3, color = 'c')
+
+    # Plot spheres to represent the drone- only 30 spheres will be plotted along the path (too slow otherwise)
+    if len(list_center) > 30:
+    # if len(xr) > 30:
+        # DRONE
+        plt_sphere(ax, list_center[::math.floor(len(list_center) / 30.0)], drone_radius, 'c', 0.7) 
+
+        # ROVER
+        x_left = xr3[::math.floor(len(xr3) / 15.0)] - 0.5
+        x_right = xr3[::math.floor(len(xr3) / 15.0)] + 0.5
+
+        y_left = yr3[::math.floor(len(yr3) / 15.0)] - 0.5
+        y_right = yr3[::math.floor(len(yr3) / 15.0)] + 0.5
+
+        z_left = zr3[::math.floor(len(zr3) / 15.0)] - 0.5
+        z_right = zr3[::math.floor(len(zr3) / 15.0)] + 0.5
+
+        plot_rectangular_prism(ax, np.concatenate((x_left.reshape(len(x_left), 1), x_right.reshape(len(x_right), 1)), axis = 1), \
+                                   np.concatenate((y_left.reshape(len(y_left), 1), y_right.reshape(len(y_right), 1)), axis = 1), \
+                                   np.concatenate((z_left.reshape(len(z_left), 1), z_right.reshape(len(z_right), 1)), axis = 1), 'c', 0.5)
+
+    elif len(list_center) > 0:
+        # DRONE
+        plt_sphere(ax, list_center, drone_radius, 'c', 0.7) 
+
+        # ROVER
+        x_left = xr3 - 0.5
+        x_right = xr3 + 0.5
+
+        y_left = yr3 - 0.5
+        y_right = yr3 + 0.5
+
+        z_left = zr3 - 0.5
+        z_right = zr3 + 0.5
+
+        plot_rectangular_prism(ax, np.concatenate((x_left, x_right), axis = 1), np.concatenate((y_left, y_right), axis = 1), np.concatenate((z_left, z_right), axis = 1), 'c', 0.5)
 
 
     # Plot start and goal points
 
     # DRONE
     ax.scatter(start[0], start[1], start[2], color = 'b')
-    ax.scatter(goal[0], goal[1], goal[2], color = 'g')
+    ax.scatter(goal1[0], goal1[1], goal1[2], color = 'g')
+
+    ax.scatter(start2[0], start2[1], start2[2], color = 'b')
+    ax.scatter(goal2[0], goal2[1], goal2[2], color = 'g')
+
+    ax.scatter(start3[0], start3[1], start3[2], color = 'b')
+    ax.scatter(goal3[0], goal3[1], goal3[2], color = 'g')
 
     # ROVER
-    ax.scatter(start[0], start[1], 0.5, color = 'b')
-    ax.scatter(goal[0], goal[1], 0.5, color = 'g')
+    ax.scatter(start[6], start[7], 0.5, color = 'b')
+    ax.scatter(goal1[6], goal1[7], 0.5, color = 'g')
+
+    ax.scatter(start2[6], start2[7], 0.5, color = 'b')
+    ax.scatter(goal2[6], goal2[7], 0.5, color = 'g')
+
+    ax.scatter(start3[6], start3[7], 0.5, color = 'b')
+    ax.scatter(goal3[6], goal3[7], 0.5, color = 'g')
 
     # Plot goal region
 
     # DRONE
-    plot_rectangular_prism(ax, np.array([[8.5, 10.5]]), np.array([[7.5, 9.5]]), np.array([[3.5, 5.5]]), 'g', 0.2)
+    plot_rectangular_prism(ax, np.array([[6.5, 8.5]]), np.array([[7.5, 9.5]]), np.array([[3.5, 5.5]]), 'g', 0.2)
+    
+    plot_rectangular_prism(ax, np.array([[13.0, 15.0]]), np.array([[9.0, 11.0]]), np.array([[6.0, 8.0]]), 'g', 0.2)
+    
+    plot_rectangular_prism(ax, np.array([[6.5, 8.5]]), np.array([[13.0, 15.0]]), np.array([[3.5, 5.5]]), 'g', 0.2)
 
     # ROVER
-    plot_rectangular_prism(ax, np.array([[8.5, 10.5]]), np.array([[7.5, 9.5]]), np.array([[0.0, 2.0]]), 'g', 0.2)
+    plot_rectangular_prism(ax, np.array([[6.5, 8.5]]), np.array([[7.5, 9.5]]), np.array([[0.0, 2.0]]), 'g', 0.2)
+    
+    plot_rectangular_prism(ax, np.array([[0.0, 2.0]]), np.array([[9.0, 11.0]]), np.array([[0.0, 2.0]]), 'g', 0.2)
+
+    plot_rectangular_prism(ax, np.array([[6.5, 8.5]]), np.array([[13.0, 15.0]]), np.array([[0.0, 2.0]]), 'g', 0.2)
+    
 
     # Plot obstacles    
     plot_rectangular_prism(ax, np.array([[0.0, 2.0]]), np.array([[4.0, 6.0]]), np.array([[0.0, 2.0]]), 'r', 0.2)
     
     plot_rectangular_prism(ax, np.array([[13.0, 15.0]]), np.array([[4.0, 6.0]]), np.array([[0.0, 2.0]]), 'r', 0.2)
-    # plot_rectangular_prism(ax, np.array([[4.0, 6.0]]), np.array([[4.0, 6.0]]), np.array([[8.0, 10.0]]), 'r', 0.2)
-
     
-    # [fcl.Box(np.array([15, 2, 8])), fcl.Transform3f(np.eye(3), np.array([7.5, 3.0, 6.0]))]
+    plot_rectangular_prism(ax, np.array([[4.0, 6.0]]), np.array([[11.0, 13.0]]), np.array([[0.0, 2.0]]), 'r', 0.2)
+    
+    plot_rectangular_prism(ax, np.array([[9.0, 11.0]]), np.array([[11.0, 13.0]]), np.array([[0.0, 2.0]]), 'r', 0.2)
+    
+    plot_rectangular_prism(ax, np.array([[4.0, 6.0]]), np.array([[11.0, 13.0]]), np.array([[8.0, 10.0]]), 'r', 0.2)
+    
+    plot_rectangular_prism(ax, np.array([[9.0, 11.0]]), np.array([[11.0, 13.0]]), np.array([[8.0, 10.0]]), 'r', 0.2)
     
     plot_rectangular_prism(ax, np.array([[0.0, 15.0]]), np.array([[4.0, 6.0]]), np.array([[2.0, 10.0]]), 'r', 0.2)
 
