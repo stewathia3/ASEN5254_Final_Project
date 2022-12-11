@@ -621,10 +621,12 @@ if __name__ == '__main__':
     x,y,z,psi,theta,v = 1,1,1.5,0,0,0
 
     # Obstacles                                                                       x     y    z
-                # Stalagmite (on ground)
-    obstacles = [[fcl.Box(np.array([2, 2, 2])), fcl.Transform3f(np.eye(3), np.array([3.0, 3.0, 1.0]))],
-                # Stalactite (on ceiling)
-                 [fcl.Box(np.array([2, 2, 2])), fcl.Transform3f(np.eye(3), np.array([5.0, 5.0, 9.0]))]]
+                # Stalagmites (on ground)
+    obstacles = [[fcl.Box(np.array([2, 2, 2])), fcl.Transform3f(np.eye(3), np.array([1.0, 5.0, 1.0]))],
+
+                [fcl.Box(np.array([2, 2, 2])), fcl.Transform3f(np.eye(3), np.array([14.0, 5.0, 1.0]))],
+                # Stalactites (on ceiling)
+                 [fcl.Box(np.array([15, 2, 8])), fcl.Transform3f(np.eye(3), np.array([7.5, 5.0, 6.0]))]]
 
     # For single agents:
 
@@ -721,7 +723,7 @@ if __name__ == '__main__':
                                    np.concatenate((y_left.reshape(len(y_left), 1), y_right.reshape(len(y_right), 1)), axis = 1), \
                                    np.concatenate((z_left.reshape(len(z_left), 1), z_right.reshape(len(z_right), 1)), axis = 1), 'k', 0.5)
 
-    else:
+    elif len(list_center) > 0:
         # DRONE
         plt_sphere(ax, list_center, drone_radius, 'k', 0.7) 
 
@@ -757,8 +759,15 @@ if __name__ == '__main__':
     plot_rectangular_prism(ax, np.array([[8.5, 10.5]]), np.array([[7.5, 9.5]]), np.array([[0.0, 2.0]]), 'g', 0.2)
 
     # Plot obstacles    
-    plot_rectangular_prism(ax, np.array([[2.0, 4.0]]), np.array([[2.0, 4.0]]), np.array([[0.0, 2.0]]), 'r', 0.2)
-    plot_rectangular_prism(ax, np.array([[4.0, 6.0]]), np.array([[4.0, 6.0]]), np.array([[8.0, 10.0]]), 'r', 0.2)
+    plot_rectangular_prism(ax, np.array([[0.0, 2.0]]), np.array([[4.0, 6.0]]), np.array([[0.0, 2.0]]), 'r', 0.2)
+    
+    plot_rectangular_prism(ax, np.array([[13.0, 15.0]]), np.array([[4.0, 6.0]]), np.array([[0.0, 2.0]]), 'r', 0.2)
+    # plot_rectangular_prism(ax, np.array([[4.0, 6.0]]), np.array([[4.0, 6.0]]), np.array([[8.0, 10.0]]), 'r', 0.2)
+
+    
+    # [fcl.Box(np.array([15, 2, 8])), fcl.Transform3f(np.eye(3), np.array([7.5, 3.0, 6.0]))]
+    
+    plot_rectangular_prism(ax, np.array([[0.0, 15.0]]), np.array([[4.0, 6.0]]), np.array([[2.0, 10.0]]), 'r', 0.2)
 
     # Label plot and axes
     ax.set_title('Rover and Quadrotor Trajectory')
