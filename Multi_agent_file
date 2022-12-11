@@ -224,29 +224,26 @@ def create_rrt(start, goal,n, Q, plot_path,rover_parked,drone_parked):
         #get the trajectory of the sampled state
         trajectories,time =  GenerateTrajectory(state.point,new_state)
 
-
-
         Valid = TrajectoryValid(trajectories,time)
 
-        
         if Valid:
             # Add new Node
             x_new = trajectories[:,-1]
     
             #single agent tests
             # x,y,z,p,ta,v = x_new
-            #xr,yr,tr = x_new
+            # xr,yr,tr = x_new
 
             #multi agent
             x,y,z,p,ta,v,xr,yr,tr = x_new
+
             if drone_parked == False and 9<=x<=11 and 8<=y<=10 and 3<=z<=5 and -1/20<=v<=1/20:
-                 drone_parked = True
-                 drone_state_last = x_new[0:6]
+                drone_parked = True
+                drone_state_last = x_new[0:6]
 
             if rover_parked == False and 9<=xr<=11 and 8<=yr<=10:
-                 rover_parked = True
-                 rover_state_last = x_new[6:]
-
+                rover_parked = True
+                rover_state_last = x_new[6:]
 
             #name, new node, parent node, distance from parent node
             curr_node = Node(len(tree), x_new, state, math.dist(x_new, state.point),trajectories)
@@ -407,7 +404,7 @@ if __name__ == '__main__':
 
     # Plot goal region
     plot_rectangular_prism(ax, np.array([9.0, 11.0]), np.array([8.0, 10.0]), np.array([3.0, 5.0]), 'g', 0.2)
-    plot_rectangular_prism(ax, np.array([9.0, 11.0]), np.array([8.0, 10.0]), np.array([0.0, 0.0]), 'g', 0.2)
+    plot_rectangular_prism(ax, np.array([9.0, 11.0]), np.array([8.0, 10.0]), np.array([0.0, 2.0]), 'g', 0.2)
 
     ax.set_title('Multi Agent Trajectory')
     #ax.set_title('Quadrotor Trajectory')

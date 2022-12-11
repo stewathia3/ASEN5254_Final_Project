@@ -130,6 +130,39 @@ def RoverDynamics(t,state,uv,up): #ode function
 
 
 #-----------------------------------------------------------------------------#
+# Function: MultiAgentDynamics
+# Purpose:  ODE function for the ode45 integrator for the rover's dynamics.
+#
+# Inputs:
+#   - t:        int- required input for ode integrator
+#   - state:    np.array- 6x1 current state of the rover
+#   - uv:       double- control input for linear acceleration
+#   - up:       double- control input for theta angular acceleration
+#
+# Outputs:
+#   - next_state: np.array- 6x1 next state of the rover
+#-----------------------------------------------------------------------------#
+def MultiAgentDynamics(t,state,u1,u2,u3,uv,up):
+    x,y,z,psi,theta,v,xr,yr,tr = state
+    omega,alpha,a = u1,u2,u3
+    
+    #input state: [x,y,z,psi,theta,v]
+    xdot = v*np.cos(psi)*np.cos(theta)
+    ydot = v*np.sin(psi)*np.cos(theta)
+    zdot = v*np.sin(theta) 
+    psidot = omega
+    thetadot = alpha 
+    vdot = a
+
+    L = 1 #car length
+    #input state: [x,y,theta]
+    xrdot = uv*np.cos(tr)
+    yrdot = uv*np.sin(tr)
+    trdot = uv/L*np.tan(up)
+
+    return [xdot,ydot,zdot,psidot,thetadot,vdot,xrdot,yrdot,trdot]
+
+#-----------------------------------------------------------------------------#
 # Function: generateNode
 # Purpose:  ODE function for the ode45 integrator for the rover's dynamics.
 #
@@ -168,10 +201,10 @@ def generateNode(Q,q_goal): #generate 6 state
 
         #single agent tests
         # q_rand = [x,y,z,p,ta,v]
-        q_rand = [xr,yr,tr]
+        # q_rand = [xr,yr,tr]
 
         #for multi agent 
-        # q_rand = [x,y,z,p,ta,v,xr,yr,tr]
+        q_rand = [x,y,z,p,ta,v,xr,yr,tr]
         
         
     elif chance >= Q:
@@ -211,13 +244,21 @@ def GenerateTrajectory(state,new_state): #state is qnear and new_state is q_rand
         control_rover = (uv,up)
         #.y gets the results, .t gets the time
 
+        control_multi = (u1,u2,u3,up,uv)
+
         #for one agent
         # result_solve_ivp = solve_ivp(DroneDynamics, t_span, state,args=control, method = 'RK45')
-        result_solve_ivp = solve_ivp(RoverDynamics, t_span, state,args=control_rover, method = 'RK45')
+        # result_solve_ivp = solve_ivp(RoverDynamics, t_span, state,args=control_rover, method = 'RK45')
+
+        # traj = result_solve_ivp.y
+        # best_con = math.dist(new_state,traj[:,-1])
+        # if best_con < min_dist:
+        #     min_dist = best_con
+        #     trajectories = traj
+        #     time = result_solve_ivp.t
 
         #this will be used for multi agent
-        # result_solve_ivp = solve_ivp(DroneDynamics, t_span, state[0:5],args=control, method = 'RK45')
-        # result_solve_ivp = solve_ivp(RoverDynamics, t_span, state[6:8],args=control_rover, method = 'RK45')
+        result_solve_ivp = solve_ivp(MultiAgentDynamics, t_span, state,args=control_multi, method = 'RK45')
     
         traj = result_solve_ivp.y
         best_con = math.dist(new_state,traj[:,-1])
@@ -225,7 +266,6 @@ def GenerateTrajectory(state,new_state): #state is qnear and new_state is q_rand
             min_dist = best_con
             trajectories = traj
             time = result_solve_ivp.t
-
     
     return trajectories,time
 
@@ -247,41 +287,67 @@ def TrajectoryValid(trajectories,time, obstacles = []):
 
     #for single agent
     # x,y,z,ta,v = trajectories[0,:],trajectories[1,:],trajectories[2,:],trajectories[4,:],trajectories[5,:]
-    xr,yr = trajectories[0,:],trajectories[1,:]
+    # xr,yr = trajectories[0,:],trajectories[1,:]
 
     # for multi agent
-    # x,y,z,ta,v,xr,yr =  trajectories[0,:],trajectories[1,:],trajectories[2,:],trajectories[4,:],trajectories[5,:],trajectories[6,:],trajectories[7,:]
+    x,y,z,ta,v,xr,yr =  trajectories[0,:],trajectories[1,:],trajectories[2,:],trajectories[4,:],trajectories[5,:],trajectories[6,:],trajectories[7,:]
 
-    # DRONE
+    # # DRONE
     # agent = fcl.Sphere(0.2)
 
-    # ROVER
-    agent = fcl.Box(np.array([1.0, 1.0, 1.0]))
+    # # ROVER
+    # # agent = fcl.Box(np.array([1.0, 1.0, 1.0]))
 
-    #trajectory out of given constraints
+    # Valid = 1 # Let's assume the trajectory is valid until proven invalid
+
     # for i in range(len(time)): 
     #     # if (0<=xr[i]<=11) and (0<=yr[i]<=10):
-    #     # if (0<=x[i]<=11) and (0<=y[i]<=10) and (0<=z[i]<=10) and (-1<=v[i]<=1) and (-np.pi/3<=ta[i]<=np.pi/3) and (0<=xr[i]<=11) and (0<=yr[i]<=10):
     #     if (0<=x[i]<=11) and (0<=y[i]<=10) and (0<=z[i]<=10) and (-1<=v[i]<=1) and (-np.pi/3<=ta[i]<=np.pi/3):
     #         Valid = 1
-            
-    #     else:   
+    #     else:
     #         Valid = 0
     #         break
+
+    #     # Collision check
+    #     # M_agent = fcl.Transform3f(np.eye(3), np.array([xr[i], yr[i], 0.5]))
+    #     M_agent = fcl.Transform3f(np.eye(3), np.array([x[i], y[i], z[i]]))
+
+    #     req = fcl.CollisionRequest()
+    #     res = fcl.CollisionResult()
+
+    #     # loop over obstacles
+    #     for obs_i in range(len(obstacles)):
+
+    #         # create obstacle
+    #         obstacle = obstacles[obs_i][0]
+    #         M_obstacle = obstacles[obs_i][1]
+
+            
+    #         if fcl.collide(agent, M_agent, obstacle, M_obstacle, req, res):
+    #             Valid = 0
+    #             break
+
+    # return Valid
+
+    # DRONE
+    drone = fcl.Sphere(0.2)
+
+    # ROVER
+    rover = fcl.Box(np.array([1.0, 1.0, 1.0]))
 
     Valid = 1 # Let's assume the trajectory is valid until proven invalid
 
     for i in range(len(time)): 
-        if (0<=xr[i]<=11) and (0<=yr[i]<=10):
-        # if (0<=x[i]<=11) and (0<=y[i]<=10) and (0<=z[i]<=10) and (-1<=v[i]<=1) and (-np.pi/3<=ta[i]<=np.pi/3):
+        # if (0<=xr[i]<=11) and (0<=yr[i]<=10):
+        if (0<=x[i]<=11) and (0<=y[i]<=10) and (0<=z[i]<=10) and (-1<=v[i]<=1) and (-np.pi/3<=ta[i]<=np.pi/3) and (0<=xr[i]<=11) and (0<=yr[i]<=10):
             Valid = 1
         else:
             Valid = 0
             break
 
         # Collision check
-        M_agent = fcl.Transform3f(np.eye(3), np.array([xr[i], yr[i], 0.5]))
-        # M_agent = fcl.Transform3f(np.eye(3), np.array([x[i], y[i], z[i]]))
+        M_rover = fcl.Transform3f(np.eye(3), np.array([xr[i], yr[i], 0.5]))
+        M_drone = fcl.Transform3f(np.eye(3), np.array([x[i], y[i], z[i]]))
 
         req = fcl.CollisionRequest()
         res = fcl.CollisionResult()
@@ -293,12 +359,14 @@ def TrajectoryValid(trajectories,time, obstacles = []):
             obstacle = obstacles[obs_i][0]
             M_obstacle = obstacles[obs_i][1]
 
-            
-            if fcl.collide(agent, M_agent, obstacle, M_obstacle, req, res):
+            if fcl.collide(drone, M_drone, obstacle, M_obstacle, req, res):
                 Valid = 0
                 break
 
-    
+            if fcl.collide(rover, M_rover, obstacle, M_obstacle, req, res):
+                Valid = 0
+                break
+
     return Valid
 
 
@@ -348,7 +416,7 @@ def plt_sphere(ax, list_center, list_radius, color, alpha):
 #   - kino_path:        np.array- vector of states for all sub-trajectories in
 #                       final path
 #-----------------------------------------------------------------------------#
-def create_rrt(start, goal, n, Q, plot_path = False, obstacles = []):
+def create_rrt(start, goal, n, Q, rover_parked, drone_parked, plot_path = False, obstacles = []):
 
 
     # STEP 1: Initialize tree with root/start node
@@ -358,10 +426,10 @@ def create_rrt(start, goal, n, Q, plot_path = False, obstacles = []):
 
     #single agent
     # x,y,z,p,ta,v = start
-    xr,yr,tr = start
+    # xr,yr,tr = start
 
     #centralized multi agent
-    # x,y,z,p,ta,v,xr,yr,tr = start
+    x,y,z,p,ta,v,xr,yr,tr = start
     solution_found = True
 
     # STEP 2: Loop until n samples created or goal reached
@@ -369,13 +437,20 @@ def create_rrt(start, goal, n, Q, plot_path = False, obstacles = []):
     # while (len(tree) < n) and not(9<=x<=11 and 8<=y<=10 and 3<=z<=5 and -1/20<=v<=1/20 and 9<=xr<=11 and 8<=yr<=10):
 
     #single agent 
-    while (len(tree) < n) and not(9<=xr<=11 and 8<=yr<=10):
-    # while (len(tree) < n) and not(9<=x<=11 and 8<=y<=10 and 3<=z<=5 and -1/20<=v<=1/20):
+    # while (len(tree) < n) and not(9<=xr<=11 and 8<=yr<=10):
+    while (len(tree) < n) and not(9<=x<=11 and 8<=y<=10 and 3<=z<=5 and -1/20<=v<=1/20 and 9<=xr<=11 and 8<=yr<=10):
 
         # print(len(tree))
         # print(math.dist(curr_node.point, goal))
         
         new_state = generateNode(Q,goal)
+
+        if rover_parked:
+            new_state[6:] = rover_state_last
+    
+        if drone_parked:
+            new_state[0:6] = drone_state_last
+
 
         # Find node from tree that is closest to q_rand
 
@@ -400,17 +475,26 @@ def create_rrt(start, goal, n, Q, plot_path = False, obstacles = []):
         if Valid:
             # Add new Node
             x_new = trajectories[:,-1]
+
+            #single agent tests
+            # x,y,z,p,ta,v = x_new
+            # xr,yr,tr = x_new
+
+            #multi agent
+            x,y,z,p,ta,v,xr,yr,tr = x_new
+
+            if drone_parked == False and 9<=x<=11 and 8<=y<=10 and 3<=z<=5 and -1/20<=v<=1/20:
+                drone_parked = True
+                drone_state_last = x_new[0:6]
+
+            if rover_parked == False and 9<=xr<=11 and 8<=yr<=10:
+                rover_parked = True
+                rover_state_last = x_new[6:]
+
             #name, new node, parent node, distance from parent node
             curr_node = Node(len(tree), x_new, state, math.dist(x_new, state.point),trajectories)
            
             tree.append(curr_node) #appends an object
-
-            #single agent tests
-            # x,y,z,p,ta,v = x_new
-            xr,yr,tr = x_new
-
-            #multi agent
-            # x,y,z,p,ta,v,xr,yr,tr = x_new
 
     if len(tree)>=n:
         solution_found = False
@@ -540,8 +624,8 @@ if __name__ == '__main__':
     # For single agents:
 
     # ROVER
-    start = [xr,yr,tr] 
-    goal = [9.5,8.5,0]
+    # start = [xr,yr,tr] 
+    # goal = [9.5,8.5,0]
 
     # DRONE
     # start = [x,y,z,psi,theta,v] 
@@ -549,8 +633,9 @@ if __name__ == '__main__':
     
     # For multi-agent, or [DRONE, ROVER]:
 
-    # start = [x,y,z,psi,theta,v,xr,yr,tr]
-    # goal = [9.5,8.5,4.5,np.random.uniform(-np.pi/2,np.pi/2),0,0,9.5,8.5,0]
+    start = [x,y,z,psi,theta,v,xr,yr,tr]
+    goal = [9.5,8.5,4.5,np.random.uniform(-np.pi/2,np.pi/2),0,0,9.5,8.5,0]
+    # goal = [10,9,4,np.random.uniform(-np.pi/2,np.pi/2),0,0,10,9,0]
 
     # number of iterations, n
     n = 5000
@@ -565,7 +650,8 @@ if __name__ == '__main__':
     # Run the RRT planner on these inputs
     #-----------------------------------------------------------------------------#
 
-    solution_found, path, path_length, tree_size,kino_path = create_rrt(start, goal, n, Q, True, obstacles)
+                                                                                    # drone_parked, rover_parked, plot_path
+    solution_found, path, path_length, tree_size,kino_path = create_rrt(start, goal, n, Q, False, False, True, obstacles)
     
 
     #kinopath is the kinodynamic path
@@ -576,17 +662,21 @@ if __name__ == '__main__':
     for i in range(len(kino_path)):
 
         # DRONE
-        # x = np.append(x,kino_path[i][0])
-        # y = np.append(y,kino_path[i][1])
-        # z= np.append(z,kino_path[i][2])
-        # p = np.append(p,kino_path[i][3])
-        # ta = np.append(ta,kino_path[i][4])
-        # v = np.append(v,kino_path[i][5])
+        x = np.append(x,kino_path[i][0])
+        y = np.append(y,kino_path[i][1])
+        z= np.append(z,kino_path[i][2])
+        p = np.append(p,kino_path[i][3])
+        ta = np.append(ta,kino_path[i][4])
+        v = np.append(v,kino_path[i][5])
 
         # ROVER
-        xr = np.append(xr,kino_path[i][0]) # or index 6
-        yr = np.append(yr,kino_path[i][1]) # or index 7
-        tr = np.append(tr,kino_path[i][2]) #or index at 8 
+        # xr = np.append(xr,kino_path[i][0]) # or index 6
+        # yr = np.append(yr,kino_path[i][1]) # or index 7
+        # tr = np.append(tr,kino_path[i][2]) #or index at 8 
+
+        xr = np.append(xr,kino_path[i][6]) # or index 6
+        yr = np.append(yr,kino_path[i][7]) # or index 7
+        tr = np.append(tr,kino_path[i][8]) #or index at 8 
 
     # Array of constant z values to plot the rover on the same 3D plot
     zr = 0.5 * np.ones(len(xr)) #this will be for plotting on the same graph 
@@ -597,20 +687,20 @@ if __name__ == '__main__':
 
     list_center = []
 
-    # for i in range(len(x)):
-    #     list_center.insert(0,(x[i],y[i],z[i]))
+    for i in range(len(x)):
+        list_center.insert(0,(x[i],y[i],z[i]))
 
     fig = plt.figure()
     ax = plt.axes(projection='3d')
 
-    # ax.plot(x,y,z)
+    ax.plot(x,y,z)
     ax.plot(xr,yr,zr)
 
     # Plot spheres to represent the drone- only 30 spheres will be plotted along the path (too slow otherwise)
-    # if len(list_center) > 30:
-    if len(xr) > 30:
+    if len(list_center) > 30:
+    # if len(xr) > 30:
         # DRONE
-        # plt_sphere(ax, list_center[::math.floor(len(list_center) / 30.0)], drone_radius, 'k', 0.7) 
+        plt_sphere(ax, list_center[::math.floor(len(list_center) / 30.0)], drone_radius, 'k', 0.7) 
 
         # ROVER
         x_left = xr[::math.floor(len(xr) / 15.0)] - 0.5
@@ -628,7 +718,7 @@ if __name__ == '__main__':
 
     else:
         # DRONE
-        # plt_sphere(ax, list_center, drone_radius, 'k', 0.7) 
+        plt_sphere(ax, list_center, drone_radius, 'k', 0.7) 
 
         # ROVER
         x_left = xr - 0.5
@@ -646,8 +736,8 @@ if __name__ == '__main__':
     # Plot start and goal points
 
     # DRONE
-    # ax.scatter(start[0], start[1], start[2], color = 'b')
-    # ax.scatter(goal[0], goal[1], goal[2], color = 'g')
+    ax.scatter(start[0], start[1], start[2], color = 'b')
+    ax.scatter(goal[0], goal[1], goal[2], color = 'g')
 
     # ROVER
     ax.scatter(start[0], start[1], 0.5, color = 'b')
@@ -656,7 +746,7 @@ if __name__ == '__main__':
     # Plot goal region
 
     # DRONE
-    # plot_rectangular_prism(ax, np.array([8.5, 10.5]), np.array([7.5, 9.5]), np.array([3.5, 5.5]), 'g', 0.2)
+    plot_rectangular_prism(ax, np.array([[8.5, 10.5]]), np.array([[7.5, 9.5]]), np.array([[3.5, 5.5]]), 'g', 0.2)
 
     # ROVER
     plot_rectangular_prism(ax, np.array([[8.5, 10.5]]), np.array([[7.5, 9.5]]), np.array([[0.0, 2.0]]), 'g', 0.2)
@@ -666,8 +756,9 @@ if __name__ == '__main__':
     plot_rectangular_prism(ax, np.array([[4.0, 6.0]]), np.array([[4.0, 6.0]]), np.array([[8.0, 10.0]]), 'r', 0.2)
 
     # Label plot and axes
+    ax.set_title('Rover and Quadrotor Trajectory')
     # ax.set_title('Quadrotor Trajectory')
-    ax.set_title('Rover Trajectory')
+    # ax.set_title('Rover Trajectory')
     ax.set_xlabel('x')
     ax.set_ylabel('y')
     ax.set_zlabel('z')
