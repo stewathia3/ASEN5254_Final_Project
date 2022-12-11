@@ -352,6 +352,11 @@ def TrajectoryValid(trajectories,time, obstacles = []):
         req = fcl.CollisionRequest()
         res = fcl.CollisionResult()
 
+        # Check if rover and drone collide
+        if fcl.collide(rover, M_rover, drone, M_drone, req, res):
+            Valid = 0
+            break
+
         # loop over obstacles
         for obs_i in range(len(obstacles)):
 
@@ -613,7 +618,7 @@ if __name__ == '__main__':
     xr,yr,tr = 1,1,0
 
     # Initial drone location (x, y, z), orientation (psi, theta), and velocity (v)
-    x,y,z,psi,theta,v = 1,1,1,0,0,0
+    x,y,z,psi,theta,v = 1,1,1.5,0,0,0
 
     # Obstacles                                                                       x     y    z
                 # Stalagmite (on ground)
