@@ -467,11 +467,8 @@ def create_rrt(start, goal_array, n, Q, rover_parked, drone_parked, plot_path = 
         if rover_parked:
             new_state[6:] = rover_state_last
     
-        if drone_parked:
-            new_state[0:6] = drone_state_last
-
-        
-
+        # if drone_parked and i > 0:
+        #     new_state[0:6] = drone_state_last
 
         # Find node from tree that is closest to q_rand
 
@@ -506,27 +503,37 @@ def create_rrt(start, goal_array, n, Q, rover_parked, drone_parked, plot_path = 
             r_low = [[xr-1,yr-1,1.2,0,2],[0,6.5,1.2,0,6.5]] #x,y,z,xr,yr
             r_high = [[xr+1,yr+1,2,15,4],[15,7.5,1.5,15,7.5]] #x,y,z,xr,yr
 
-            if drone_parked == False and r_low[i][0]<=x<=r_high[i][0] and r_low[i][1]<=y<=r_high[i][1]  and r_low[i][2]<=z<=r_high[i][2] and -1/20<=v<=1/20 and r_low[i][4]<=yr<=r_high[i][4]:
-                print("Drone parked")
-                drone_parked = True
+            # if drone_parked == False and r_low[i][0]<=x<=r_high[i][0] and r_low[i][1]<=y<=r_high[i][1]  and r_low[i][2]<=z<=r_high[i][2] and -1/20<=v<=1/20 and r_low[i][4]<=yr<=r_high[i][4]:
+            #     print("Drone parked")
+            #     drone_parked = True
+            #     drone_state_last = x_new[0:6]
+            #     mode = 0  #this will only work for my current goal, will need to change with if i = _for other goal
+
+
+            if i == 0 and mode == 1 and r_low[i][0]<=x<=r_high[i][0] and r_low[i][1]<=y<=r_high[i][1]  and r_low[i][2]<=z<=r_high[i][2] and -1/20<=v<=1/20 and r_low[i][4]<=yr<=r_high[i][4]:
+                print("Drone landed")
+                # drone_parked = True
                 drone_state_last = x_new[0:6]
                 mode = 0  #this will only work for my current goal, will need to change with if i = _for other goal
 
-
-            if i == 1 and rover_parked == False and r_low[i][4]<=yr<=r_high[i][4]:# r_low[i][3]<=xr<=r_high[i][3] and r_low[i][4]<=yr<=r_high[i][4]:
+            # if i == 1 and rover_parked == False and r_low[i][4]<=yr<=r_high[i][4]:# r_low[i][3]<=xr<=r_high[i][3] and r_low[i][4]<=yr<=r_high[i][4]:
+            if rover_parked == False and r_low[i][4]<=yr<=r_high[i][4]:# r_low[i][3]<=xr<=r_high[i][3] and r_low[i][4]<=yr<=r_high[i][4]:
                 print("Rover parked")
+                print(i)
                 rover_parked = True
                 rover_state_last = x_new[6:]
-                mode = 1
+                # mode = 1
 
             #name, new node, parent node, distance from parent node
             curr_node = Node(len(tree), x_new, state, math.dist(x_new, state.point),trajectories)
            
             tree.append(curr_node) #appends an object
 
-        if i == 0 and drone_parked:
+        # if i == 0 and drone_parked:
+        if i == 0 and mode == 0:
             i +=1 #both have met goal, continue to next go, will terminate at i = 2 when both have met the second goal
-            drone_parked = False
+            rover_parked = False
+            # drone_parked = False
             # if i == 1:
             #     rover_parked = False
             #     drone_parked = False
