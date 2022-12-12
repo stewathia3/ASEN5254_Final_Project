@@ -372,7 +372,7 @@ def GenerateTrajectoryLanding(state,new_state): #state is qnear and new_state is
         if mode == 0:
             for j in range(np.shape(traj)[1]): # [:,-1]
                 traj[0:2, j] = traj[6:8, j]
-                traj[2, j] = 1.2
+                traj[2, j] = 1.3
                 traj[3, j] = 0.0
                 traj[4, j] = 0.0
                 traj[5, j] = 0.0
@@ -784,7 +784,7 @@ def create_rrt_landing(W_bounds, start, goal_array, n, Q, rover_parked, drone_pa
 
             #multi agent
             x,y,z,p,ta,v,xr,yr,tr,mode = x_new
-            r_low = [[xr-1,yr-1,1.2,0,2],[0,6.5,1.2,0,6.5]] #x,y,z,xr,yr
+            r_low = [[xr-1,yr-1,1.3,0,2],[0,6.5,1.3,0,6.5]] #x,y,z,xr,yr
             r_high = [[xr+1,yr+1,2,15,4],[15,7.5,1.5,15,7.5]] #x,y,z,xr,yr
 
             if i == 0 and drone_parked == False and r_low[i][0]<=x<=r_high[i][0] and r_low[i][1]<=y<=r_high[i][1]  and r_low[i][2]<=z<=r_high[i][2] and -1/20<=v<=1/20 and r_low[i][4]<=yr<=r_high[i][4]:
@@ -1000,7 +1000,7 @@ if __name__ == '__main__':
 
     tries0 = 0
 
-    print("Going to goal 0")
+    print("Going to goal 1")
 
     while not solution_found0:
 
@@ -1008,9 +1008,11 @@ if __name__ == '__main__':
 
         tries0 += 1
 
-        print(tries0)
+        if not solution_found0:
 
-    print(f'Size of tree was {tree_size0}')
+            print(f"Attempt {tries0} did not converge on a solution- trying again...")
+
+    print(f'Attempt {tries0} successful! Size of tree was {tree_size0}')
 
     #kinopath is the kinodynamic path
     x0,y0,z0,p0,ta0,v0 = np.array([]),np.array([]),np.array([]),np.array([]),np.array([]),np.array([])
@@ -1103,9 +1105,11 @@ if __name__ == '__main__':
 
         tries2 += 1
 
-        print(tries2)
+        if not solution_found2:
 
-    print(f'Size of tree was {tree_size2}')
+            print(f"Attempt {tries2} did not converge on a solution- trying again...")
+
+    print(f'Attempt {tries2} successful! Size of tree was {tree_size2}')
 
     #kinopath is the kinodynamic path
     x2,y2,z2,p2,ta2,v2 = np.array([]),np.array([]),np.array([]),np.array([]),np.array([]),np.array([])
@@ -1150,9 +1154,11 @@ if __name__ == '__main__':
 
         tries3 += 1
 
-        print(tries3)
+        if not solution_found3:
 
-    print(f'Size of tree was {tree_size3}')
+            print(f"Attempt {tries3} did not converge on a solution- trying again...")
+
+    print(f'Attempt {tries3} successful! Size of tree was {tree_size3}')
 
     #kinopath is the kinodynamic path
     x3,y3,z3,p3,ta3,v3 = np.array([]),np.array([]),np.array([]),np.array([]),np.array([]),np.array([])
@@ -1421,15 +1427,20 @@ if __name__ == '__main__':
 
     # Plot goal region
 
+    plot_rectangular_prism(ax, np.array([[0.0, 15.0]]), np.array([[2.0, 4.0]]), np.array([[0.0, 0.0]]), 'g', 0.2)
+
+    plot_rectangular_prism(ax, np.array([[0.0, 15.0]]), np.array([[6.5, 8.0]]), np.array([[0.0, 0.0]]), 'g', 0.2)
+
     # DRONE
-    plot_rectangular_prism(ax, np.array([[6.5, 8.5]]), np.array([[7.5, 9.5]]), np.array([[3.5, 5.5]]), 'g', 0.2)
+
+    # plot_rectangular_prism(ax, np.array([[6.5, 8.5]]), np.array([[7.5, 9.5]]), np.array([[3.5, 5.5]]), 'g', 0.2)
     
     plot_rectangular_prism(ax, np.array([[13.0, 15.0]]), np.array([[9.0, 11.0]]), np.array([[6.0, 8.0]]), 'g', 0.2)
     
     plot_rectangular_prism(ax, np.array([[6.5, 8.5]]), np.array([[13.0, 15.0]]), np.array([[3.5, 5.5]]), 'g', 0.2)
 
     # ROVER
-    plot_rectangular_prism(ax, np.array([[6.5, 8.5]]), np.array([[7.5, 9.5]]), np.array([[0.0, 2.0]]), 'g', 0.2)
+    # plot_rectangular_prism(ax, np.array([[6.5, 8.5]]), np.array([[7.5, 9.5]]), np.array([[0.0, 2.0]]), 'g', 0.2)
     
     plot_rectangular_prism(ax, np.array([[0.0, 2.0]]), np.array([[9.0, 11.0]]), np.array([[0.0, 2.0]]), 'g', 0.2)
 
